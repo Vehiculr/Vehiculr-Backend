@@ -15,6 +15,7 @@ const postReviewRouter = require('./routes/postReviewRoutes');
 const brandRouter = require('./routes/brandRoutes');
 const garageRouter = require('./routes/garageRoutes');
 const cityRouter = require('./routes/locationRoutes');
+const feedRouter = require('./routes/feedRoutes');
 
 
 
@@ -59,6 +60,7 @@ app.use('/api/brands', brandRouter);
 app.use('/api/postReview', postReviewRouter);
 app.use('/api/garages', garageRouter);
 app.use('/api/city', cityRouter);
+app.use('/api/feed', feedRouter);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
