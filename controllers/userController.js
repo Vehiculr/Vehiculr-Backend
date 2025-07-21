@@ -10,6 +10,9 @@ exports.setUserId = (req, res, next) => {
   next();
 };
 
+exports.getAllUsers = factory.getAll(User);
+exports.createUser = factory.createOne(User);
+
 exports.getUserAddress = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user.id);
   if (!user.address) {
