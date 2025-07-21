@@ -1,7 +1,7 @@
 {
-  "name": "grorents",
+  "name": "Vehiculr",
   "version": "1.0.0",
-  "description": "A backend for rentals which connects property owners with tenants and buyers directly, thereby making buying, selling, and renting of properties simpler, convenient and affordable.",
+  "description": "Vehiculr is a comprehensive garage and vehicle servicing platform that connects users with nearby car and bike service centers. It offers booking for services, spare parts access, on-call mechanic support, and a social media-inspired review system with user feeds.",
   "main": "app.js",
   "scripts": {
     "start": "nodemon server.js",
