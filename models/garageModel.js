@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const garageSchema = new mongoose.Schema({
+  garageId: { type: String, required: true, unique: true },
   name: {
     type: String,
     required: [false, 'Garage must have a name!'],
@@ -34,10 +35,11 @@ const garageSchema = new mongoose.Schema({
       required: [false, 'Garage must have coordinates!'], // [longitude, latitude]
     },
   },
-  contact: {
+  contactInfo: {
     type: String,
     required: [false, 'Garage must have a contact number!'],
   },
+  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviews: [
     {
       user: {

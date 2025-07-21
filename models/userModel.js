@@ -20,11 +20,19 @@ const userSchema = new mongoose.Schema({
     minlength: [10, 'Please provide a valid 10-digit phone number'],
     maxlength: [10, 'Please provide a valid 10-digit phone number'],
   },
+  userName: { type: String, required: true, unique: true }, 
+  userType: { type: String, enum: ['garageOwner', 'vehicleUser'], default: 'vehicleUser' },
+  interests: [String], // e.g., "Car Modifications", "EV", etc.
+  rideDetails: {
+    brands: [String], // e.g., "Honda", "Hyundai"
+    tags: [String],   // e.g., "New Vehicle", "Pre-Owned"
+  },
   photo: { type: String, default: 'user-avatar.jpg' },
   gender: {
     type: String,
     enum: ['Male', 'Female', 'Transgender'],
   },
+   isVerified: { type: Boolean, default: false },
   dob: {
     type: Date,
     validate: {
