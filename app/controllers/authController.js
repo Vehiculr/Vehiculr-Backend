@@ -278,3 +278,34 @@ exports.sendWhatsAppPromotionMessage = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
+// msg91 integration
+const msg91 = require('../services/msg91Service');
+
+exports.sendOtpToUser = async (req, res, next) => {
+  const { phone } = req.body;
+  const generatedOtp = Math.floor(100000 + Math.random() * 900000);
+
+  try {
+    await msg91.sendOTP(phone, generatedOtp);
+    res.status(200).json({ message: 'OTP sent successfully' });
+  } catch (err) {
+    next(new AppError('Failed to send OTP', 500));
+  }
+};
+
+exports.verifyUserOtp = async (req, res, next) => {
+  const { phone, otp } = req.body;
+
+  try {
+    const result = await msg91.verifyOTP(phone, otp);
+
+    if (result.type === 'success') {
+      res.status(200).json({ message: 'OTP verified successfully' });
+    } else {
+      next(new AppError('Invalid OTP', 400));
+    }
+  } catch (err) {
+    next(new AppError('OTP verification failed', 500));
+  }
+};
