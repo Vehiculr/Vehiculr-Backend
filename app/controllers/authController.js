@@ -5,7 +5,9 @@ const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const sendEmail = require('../utils/email');
-
+const { sendOTP } = require('../services/twilioClient');
+const generateOTP = require('../utils/generateOTP');
+const { sendWhatsAppMessage } = require('../services/twilioClient');
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -35,32 +37,32 @@ const createSendToken = (user, statusCode, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      status: 'fail',
-      message: 'Name, email, and password are required.',
-    });
-  }
+  // const { name, email, password } = req.body;
+  // if (!name || !email || !password) {
+  //   return res.status(400).json({
+  //     status: 'fail',
+  //     message: 'Name, email, and password are required.',
+  //   });
+  // }
   // Check if user with the given email already exists
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(409).json({
-      status: 'fail',
-      message: 'Email already exists.',
-    });
-  }
+  // const existingUser = await User.findOne({ email });
+  // if (existingUser) {
+  //   return res.status(409).json({
+  //     status: 'fail',
+  //     message: 'Email already exists.',
+  //   });
+  // }
   // const user =Object.keys(req.body).filter(field=>field!=='role');
   const newUser = await User.create({
     name: req.body.name,
-    email: req.body.email,
-    // phoneNo: req.body.phoneNo,
+    // email: req.body.email,
+    phone: req.body.phone,
     // gender: req.body.gender,
     // dob: req.body.dob,
     // photo: req.body.photo,
     // occupation: req.body.occupation,
     // address: req.body.address,
-    password: req.body.password,
+    // password: req.body.password,
     // passwordConfirm: req.body.passwordConfirm,
   });
   createSendToken(newUser, 201, res);
@@ -70,9 +72,9 @@ exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
 
   // 1) Check if email and password exist
-  if (!email || !password) {
-    return next(new AppError('Please provide email and password!', 400));
-  }
+  // if (!email || !password) {
+  //   return next(new AppError('Please provide email and password!', 400));
+  // }
   // 2) Check if user exists && password is correct
   const user = await User.findOne({ email }).select('+password');
 
@@ -195,3 +197,84 @@ user.passwordConfirm = req.body.passwordConfirm;
   // 4) Send JWT to client
   createSendToken(user, 200, res);
 });
+
+
+exports.requestOTP = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: "Phone number is required" });
+
+    let user = await User.findOne({ phone });
+
+    if (!user) {
+      user = await User.create({ phone });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + process.env.OTP_EXPIRY * 60000); // OTP expires in X minutes
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+    const twilioResponse = await sendOTP(phone, otp);
+    if (!twilioResponse.success) {
+      return res.status(500).json({ message: "OTP sending failed", error: twilioResponse.error });
+    }
+
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// 2️⃣ Verify OTP
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ message: "Phone and OTP are required" });
+
+    const user = await User.findOne({ phone });
+
+    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.isVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    const token = jwt.sign({ id: user._id, phone: user.phone }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.status(200).json({ message: "OTP verified successfully", token });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+exports.sendWhatsAppPromotionMessage = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: "whatsapp number is required" });
+
+    let user = await User.findOne({ phone });
+
+    if (!user) {
+      user = await User.create({ phone });
+    }
+
+    message = `*Garages of India* 🚗\n\n_Exciting Offers Await!_\n\n🛠️ Get your vehicle serviced now!\n📍 Available in 25+ cities\n\n👉 Visit: www.garagesofindia.com`
+
+    await user.save();
+    const twilioResponse = await sendWhatsAppMessage(phone, message);
+    if (!twilioResponse.success) {
+      return res.status(500).json({ message: "OTP sending failed", error: twilioResponse.error });
+    }
+
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
