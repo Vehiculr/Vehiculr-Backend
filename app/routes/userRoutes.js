@@ -2,7 +2,7 @@ const express = require('express');
 const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
 const addressController = require('../controllers/addressController');
-const houseRouter = require('../routes/houseRoutes');
+const houseRouter = require('./houseRoutes');
 
 const router = express.Router({ mergeParams: true });
 
