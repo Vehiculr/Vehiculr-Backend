@@ -77,6 +77,22 @@ const userSchema = new mongoose.Schema({
     default: false,
     select: false,
   },
+    followersCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  followingCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  profileImage: String,
+  bio: String,
+  joinDate: {
+    type: Date,
+    default: Date.now
+  },
   devices: [
     {
       name: String,
