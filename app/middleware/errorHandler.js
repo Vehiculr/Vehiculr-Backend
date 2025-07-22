@@ -1,9 +1,10 @@
 // app/middleware/errorHandler.js
-module.exports = function errorHandler(err, req, res, next) {
-    const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+module.exports = (err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
 
-    res.status(statusCode).json({
-        message: err.message || 'Internal Server Error',
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-    });
+  res.status(statusCode).json({
+    status: err.status || 'error',
+    message: err.message || 'Internal Server Error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 };
