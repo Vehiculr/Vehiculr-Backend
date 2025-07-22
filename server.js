@@ -1,26 +1,59 @@
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-// require('dotenv').config();
+require('express-async-errors');
+require('dotenv').config({ path: './.env' });
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-
-dotenv.config({ path: './.env' });
 const app = require('./app');
+const logger = require('./utils/logger').getLogger(__filename);
 
-// DATABASE_LOCAL=mongodb://localhost:27017/rentalPGApp
-// const DB = process.env.DATABASE_LOCAL || "mongodb://localhost:27018/rentalPGApp";
 // const DB = process.env.DATABASE.replace('<PASSWORD>', process.env.DATABASE_PASSWORD);
-// const MONGO_URL ="mongodb://mongo:27017/rentalPGApp";
-// const DB = "mongodb://localhost:27017/rentalPGApp";
-mongoose.connect(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 10000 })
-  .then(() => console.log('✅ MongoDB Connected!'))
-  .catch(err => console.log('❌ MongoDB Connection Error:', err));
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => logger.info('✅ MongoDB connected'))
+  .catch(err => logger.error('❌ MongoDB connection error:', err));
+
+const disconnectDB = async () => {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+    logger.info('MongoDB disconnected');
+  }
+};
+
+
+// Uncaught Exceptions (sync errors)
+process.on('uncaughtException', (err) => {
+logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  logger.error(err.name, err.message);
+  process.exit(1); // Optional: exit to avoid unstable state
+});
+
+// Graceful shutdown
+const cleanup = async () => {
+  await disconnectDB();
+  logger.info('🧹 Cleanup done. Shutting down...');
+  // Example: close DB connection or Redis
+  // mongoose.connection.close()
+  // redisClient.quit()
+};
+
+process.once('SIGINT', async () => {
+  logger.warn('SIGINT received (Ctrl+C). Shutting down...');
+  await cleanup();
+  process.exit(0);
+});
+
+process.once('SIGTERM', async () => {
+  logger.warn('SIGTERM received. Shutting down...');
+  await cleanup();
+  process.exit(0);
+});
+
+process.once('exit', async () => {
+  await cleanup();
+});
 
 const port = process.env.PORT || 9003;
-// const port = 3000;
-
 const server = app.listen(port, () => {
-  console.log(`App running on port ${port}...`);
-});
+logger.info(`🚀 App running on port ${port} in ${process.env.NODE_ENV} mode`)});
 
 process.on('unhandledRejection', (err) => {
   console.log('UNHANDLED REJECTION! 💥 Shutting down...');
