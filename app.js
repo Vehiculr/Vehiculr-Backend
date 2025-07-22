@@ -1,24 +1,24 @@
 const express = require('express');
 require('express-async-errors');
 const rateLimit = require('express-rate-limit');
-const errorHandler = require('./middleware/errorHandler');
+const errorHandler = require('./app/middleware/errorHandler');
 const morgan = require('morgan');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 
-const AppError = require('./utils/appError');
-const globalErrorHandler = require('./controllers/errorController');
-const houseRouter = require('./routes/houseRoutes');
-const userRouter = require('./routes/userRoutes');
-const reviewRouter = require('./routes/reviewRoutes');
-const bookingRouter = require('./routes/bookingRoutes');
-const blogRouter = require('./routes/blogRoutes');
-const postReviewRouter = require('./routes/postReviewRoutes');
-const brandRouter = require('./routes/brandRoutes');
-const garageRouter = require('./routes/garageRoutes');
-const cityRouter = require('./routes/locationRoutes');
-const feedRouter = require('./routes/feedRoutes');
+const AppError = require('./app/utils/appError');
+const globalErrorHandler = require('./app/controllers/errorController');
+const houseRouter = require('./app/routes/houseRoutes');
+const userRouter = require('./app/routes/userRoutes');
+const reviewRouter = require('./app/routes/reviewRoutes');
+const bookingRouter = require('./app/routes/bookingRoutes');
+const blogRouter = require('./app/routes/blogRoutes');
+const postReviewRouter = require('./app/routes/postReviewRoutes');
+const brandRouter = require('./app/routes/brandRoutes');
+const garageRouter = require('./app/routes/garageRoutes');
+const cityRouter = require('./app/routes/locationRoutes');
+const feedRouter = require('./app/routes/feedRoutes');
 
 
 

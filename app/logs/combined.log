@@ -1,0 +1,13 @@
+2025-07-22 17:29:43 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:31:24 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:31:33 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:33:27 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:34:16 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:34:23 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:35:57 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-22 17:36:02 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-23 00:43:38 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-23 00:51:28 [server.js] ERROR: ❌ MongoDB connection error: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+2025-07-23 00:52:13 [server.js] INFO: ✅ MongoDB connected
+2025-07-23 01:21:48 [server.js] INFO: 🚀 App running on port 9002 in development mode
+2025-07-23 01:21:48 [server.js] INFO: ✅ MongoDB connected

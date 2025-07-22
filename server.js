@@ -4,7 +4,7 @@ require('dotenv').config({ path: './.env' });
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
 const app = require('./app');
-const logger = require('./utils/logger').getLogger(__filename);
+const logger = require('./app/utils/logger').getLogger(__filename);
 
 // const DB = process.env.DATABASE.replace('<PASSWORD>', process.env.DATABASE_PASSWORD);
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
