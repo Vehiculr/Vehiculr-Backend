@@ -5,7 +5,7 @@ const SENDER_ID = process.env.MSG91_SENDER_ID;
 const OTP_EXPIRY = process.env.MSG91_OTP_EXPIRY || 5;
 
 // ✅ Send OTP via SMS
-exports.sendOTP = async (mobile, otp) => {
+exports.sendOTPmsg91 = async (mobile, otp) => {
   try {
     const response = await axios.post(`https://control.msg91.com/api/v5/otp`, {
       mobile: mobile,
@@ -18,7 +18,7 @@ exports.sendOTP = async (mobile, otp) => {
         'Content-Type': 'application/json'
       }
     });
-
+console.log('OTP sent successfully:', response.data);
     return response.data;
   } catch (err) {
     console.error('❌ Error sending OTP:', err.response?.data || err.message);
