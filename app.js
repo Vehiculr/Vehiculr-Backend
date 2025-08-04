@@ -20,6 +20,9 @@ const garageRouter = require('./app/routes/garageRoutes');
 const cityRouter = require('./app/routes/locationRoutes');
 const feedRouter = require('./app/routes/feedRoutes');
 
+//partner Api
+const partnerRouter = require('./app/routes/partnerRoutes');
+
 
 
 
@@ -77,6 +80,7 @@ app.use('/api/postReview', postReviewRouter);
 app.use('/api/garages', garageRouter);
 app.use('/api/city', cityRouter);
 app.use('/api/feed', feedRouter);
+app.use('/api/partners', partnerRouter);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
