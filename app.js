@@ -82,6 +82,7 @@ app.use('/api/city', cityRouter);
 app.use('/api/feed', feedRouter);
 app.use('/api/partners', partnerRouter);
 
+
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
