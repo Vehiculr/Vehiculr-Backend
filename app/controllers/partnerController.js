@@ -40,3 +40,38 @@ exports.getPartnerById = async (req, res) => {
     res.status(500).json({ status: 'error', message: err.message });
   }
 };
+
+// VERIFY KYC (new endpoint)
+exports.verifyKYC = async (req, res) => {
+  try {
+    const { type, fullName, documentNumber, address } = req.body;
+
+    // 1️⃣ Find Partner
+    const partner = await Partner.findById(req.params.id);
+    if (!partner) return res.status(404).json({ status: 'fail', message: 'Partner not found' });
+
+    // 2️⃣ Prevent overwriting verified KYC
+    if (partner.kyc && partner.kyc.verified) {
+      return res.status(400).json({ status: 'fail', message: 'KYC is already verified' });
+    }
+
+    // 3️⃣ Update KYC
+    partner.kyc = {
+      type,
+      fullName,
+      documentNumber,
+      address,
+      verified: true
+    };
+
+    await partner.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'KYC verified successfully',
+      data: partner
+    });
+  } catch (err) {
+    res.status(400).json({ status: 'fail', message: err.message });
+  }
+};

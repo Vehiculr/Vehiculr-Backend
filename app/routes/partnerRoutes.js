@@ -6,5 +6,7 @@ const partnerController = require('../controllers/partnerController');
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
 router.get('/:id', partnerController.getPartnerById);
+// New KYC verification route
+router.patch('/:id/kyc-verify', partnerController.verifyKYC);
 
 module.exports = router;
