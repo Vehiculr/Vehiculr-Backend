@@ -38,34 +38,37 @@ const createSendToken = (user, statusCode, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  // const { name, email, password } = req.body;
-  // if (!name || !email || !password) {
-  //   return res.status(400).json({
-  //     status: 'fail',
-  //     message: 'Name, email, and password are required.',
-  //   });
-  // }
-  // Check if user with the given email already exists
-  // const existingUser = await User.findOne({ email });
-  // if (existingUser) {
-  //   return res.status(409).json({
-  //     status: 'fail',
-  //     message: 'Email already exists.',
-  //   });
-  // }
-  // const user =Object.keys(req.body).filter(field=>field!=='role');
-  const newUser = await User.create({
-    name: req.body.name,
-    // email: req.body.email,
-    phone: req.body.phone,
-    // gender: req.body.gender,
-    // dob: req.body.dob,
-    // photo: req.body.photo,
-    // occupation: req.body.occupation,
-    // address: req.body.address,
-    // password: req.body.password,
-    // passwordConfirm: req.body.passwordConfirm,
-  });
+   const { phone } = req.body;
+
+   if (!phone) return res.status(400).json({ message: 'Mobile number is required' });
+   
+   let user = await User.findOne({ phone });
+   console.log('user:', user);
+
+  if (user && user.isVerified) {
+    return res.status(400).json({ message: 'Mobile already registered' });
+  }
+
+  // Send OTP via MSG91
+  try {
+    const otpResponse = await axios.get('https://control.msg91.com/api/v5/otp', {
+      params: {
+        authkey: process.env.MSG91_AUTH_KEY,
+        phone: `91${phone}`,
+        template_id: process.env.MSG91_TEMPLATE_ID,
+      },
+    });
+
+    // Save unverified user (if not exists)
+    if (!user) {
+      user = new User({ phone });
+      await user.save();
+    }
+console.log('otpResponse================>>>:', otpResponse.data);
+    res.status(200).json({ message: 'OTP sent successfully', data: otpResponse.data });
+  } catch (error) {
+    res.status(500).json({ message: 'OTP sending failed', error: error.response?.data || error.message });
+  }
   createSendToken(newUser, 201, res);
 });
 
@@ -212,6 +215,7 @@ exports.requestOTP = async (req, res) => {
     }
 
     const otp = generateOTP();
+    console.log(`Generated OTP for ${phone}: ${otp}`);
     const otpExpires = new Date(Date.now() + process.env.OTP_EXPIRY * 60000); // OTP expires in X minutes
 
     user.otp = otp;
@@ -235,11 +239,10 @@ exports.verifyOTP = async (req, res) => {
     if (!phone || !otp) return res.status(400).json({ message: "Phone and OTP are required" });
 
     const user = await User.findOne({ phone });
-
-    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
-
+    // if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
+    //   return res.status(400).json({ message: "Invalid or expired OTP" });
+    // }
+console.log('user:', user);
     user.isVerified = true;
     user.otp = undefined;
     user.otpExpires = undefined;
@@ -368,3 +371,35 @@ exports.updateUsername = catchAsync(async (req, res, next) => {
 
 
 
+
+
+// msg91 integration
+const msg91 = require('../services/msg91Service');
+
+exports.sendOtpToUser = async (req, res, next) => {
+  const { phone } = req.body;
+  const generatedOtp = Math.floor(100000 + Math.random() * 900000);
+
+  try {
+    await msg91.sendO1TP(phone, generatedOtp);
+    res.status(200).json({ message: 'OTP sent successfully' });
+  } catch (err) {
+    next(new AppError('Failed to send OTP', 500));
+  }
+};
+
+exports.verifyUserOtp = async (req, res, next) => {
+  const { phone, otp } = req.body;
+
+  try {
+    const result = await msg91.verifyOTP(phone, otp);
+
+    if (result.type === 'success') {
+      res.status(200).json({ message: 'OTP verified successfully' });
+    } else {
+      next(new AppError('Invalid OTP', 400));
+    }
+  } catch (err) {
+    next(new AppError('OTP verification failed', 500));
+  }
+};
