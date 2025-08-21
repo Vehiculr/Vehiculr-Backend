@@ -123,3 +123,43 @@ exports.addUserAddress = catchAsync(async (req, res, next) => {
     data: { address },
   });
 });
+exports.checkUsernameExists = async (req, res) => {
+  try {
+    const { username } = req.query;
+    const user = await User.findOne({ username });
+    console.log('username',  req.query)
+
+    if (user) {
+      return res.status(200).json({ exists: true, message: 'Username already taken' });
+    } else {
+      return res.status(200).json({ exists: false, message: 'Username is available' });
+    }
+  } catch (err) {
+    res.status(500).json({ message: 'Error checking username', error: err.message });
+  }
+};
+
+exports.updateUsername = catchAsync(async (req, res, next) => {
+  const { username } = req.body;
+
+  if (!username) {
+    return next(new AppError('Please provide a username to update', 400));
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user.id,
+    { username },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedUser) {
+    return next(new AppError('User not found', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: updatedUser,
+    },
+  });
+});

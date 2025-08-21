@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { promisify } = require('util');
+const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
@@ -278,3 +279,92 @@ exports.sendWhatsAppPromotionMessage = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
+//storing the password
+exports.storeUserPassword = catchAsync(async (req, res, next) => {
+  const { phone, password } = req.body;
+
+  if (!phone || !password) {
+    return next(new AppError('Phone and password are required.', 400));
+  }
+
+  if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+    return next(new AppError('Phone number must be a valid 10-digit number.', 400));
+  }
+
+  if (password.length < 5) {
+    return next(new AppError('Password must be at least 5 characters long.', 400));
+  }
+
+  // 1. Hash the password
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // 2. Upsert user (create if not exists)
+  const user = await User.findOneAndUpdate(
+    { phoneNo: phone },
+    {
+      password: hashedPassword,
+      passwordConfirm: hashedPassword, // Bypass validator (not ideal for production)
+      isVerified: true, // optional
+    },
+    { new: true, upsert: true, runValidators: false }
+  );
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Password stored successfully',
+    data: {
+      phone: user.phone,
+    },
+  });
+});
+
+exports.checkUsernameExists = catchAsync(async (req, res, next) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return next(new AppError('Username is required', 400));
+  }
+
+  const user = await User.findOne({ userName: username });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      exists: !!user,
+    },
+  });
+});
+
+
+
+exports.updateUsername = catchAsync(async (req, res, next) => {
+  const { newUsername } = req.body;
+
+  if (!newUsername) {
+    return next(new AppError('New username is required', 400));
+  }
+
+  const existingUser = await User.findOne({ userName: newUsername });
+
+  if (existingUser) {
+    return next(new AppError('Username already taken. Please choose another.', 409));
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user.id,
+    { userName: newUsername },
+    { new: true, runValidators: true }
+  );
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Username updated successfully',
+    data: {
+      userName: updatedUser.userName,
+    },
+  });
+});
+
+
+
