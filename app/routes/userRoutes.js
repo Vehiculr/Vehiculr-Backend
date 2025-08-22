@@ -17,6 +17,9 @@ router.post('/login', authController.login);
 router.post('/logout', authController.logout);
 router.post('/forgotPassword', authController.forgotPassword);
 router.post('/store-password', authController.storeUserPassword);
+router.post("/request-otp", authController.requestOTP);
+router.post("/verify-otp", authController.verifyOTP);
+
 
 // ✅ User routes
 router

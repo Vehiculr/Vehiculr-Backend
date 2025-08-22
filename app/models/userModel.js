@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please tell us Ayour name!'],
+    required: [true, 'Please tell us your name!'],
   },
   email: {
     type: String,
@@ -15,11 +15,10 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     validate: [validator.isEmail, 'Please provide a valid email'],
   },
-  phoneNo: {
-    type: String,
-    minlength: [10, 'Please provide a valid 10-digit phone number'],
-    maxlength: [10, 'Please provide a valid 10-digit phone number'],
+  phone: {
+    type: String
   },
+
   userName: { type: String, unique: true }, 
   userType: { type: String, enum: ['garageOwner', 'vehicleUser'], default: 'vehicleUser' },
   interests: [String], // e.g., "Car Modifications", "EV", etc.
