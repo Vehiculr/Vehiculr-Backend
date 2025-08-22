@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    // required: [true, 'Please tell us your name!'],
+    required: [true, 'Please tell us your name!'],
   },
   email: {
     type: String,
@@ -18,7 +18,8 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String
   },
-  userName: { type: String, default: 'user', unique: true }, 
+
+  userName: { type: String, unique: true }, 
   userType: { type: String, enum: ['garageOwner', 'vehicleUser'], default: 'vehicleUser' },
   interests: [String], // e.g., "Car Modifications", "EV", etc.
   rideDetails: {
