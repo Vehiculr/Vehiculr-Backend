@@ -203,11 +203,9 @@ user.passwordConfirm = req.body.passwordConfirm;
 });
 
 // PATCH API to update username or create new user
-exports.updateUserName = catchAsync(async (req, res, next) => {
+exports.updateUserProfile = catchAsync(async (req, res, next) => {
   try {
     const { username, identifier, password, firstName, lastName, phone } = req.body;
-
-    // Try to find user by email or phone
     let user = await User.findOne({
       $or: [
         { email: identifier },
@@ -218,8 +216,6 @@ exports.updateUserName = catchAsync(async (req, res, next) => {
     if (user) {
       // User exists, check if the requested username is available
       const usernameExists = await User.findOne({ username });
-      console.log('====', usernameExists)
-      
       if (usernameExists && usernameExists._id.toString() !== user._id.toString()) {
         return res.status(409).json({
           message: 'Username already taken by another user'
@@ -227,8 +223,7 @@ exports.updateUserName = catchAsync(async (req, res, next) => {
       }
 
       // Update the username
-      user.username = username;
-      console.log('== user.username==',  user.username)
+     if (username) user.username = username;
       // Optionally update other fields if provided
       if (password) {
         const salt = await bcrypt.genSalt(10);
