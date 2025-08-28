@@ -6,19 +6,34 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    // required: [true, 'Please tell us Ayour name!'],
+    // required: [true, 'Please tell us your name!'],
   },
   email: {
     type: String,
-    // // required: [true, 'Please provide your email'],
     unique: true,
+    sparse: true,
     lowercase: true,
-    validate: [validator.isEmail, 'Please provide a valid email'],
+    trim: true,
+    validate: {
+      validator: function (v) {
+        return !v || /\S+@\S+\.\S+/.test(v);
+      },
+      message: 'Please provide a valid email'
+    }
   },
   phone: {
-    type: String
+    type: String,
+    sparse: true,
+    trim: true
   },
-  userName: { type: String, default: 'user', unique: true }, 
+  username: {
+    type: String,
+    unique: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 30,
+    match: /^[a-zA-Z0-9_]+$/ // Alphanumeric and underscores only
+  },
   userType: { type: String, enum: ['garageOwner', 'vehicleUser'], default: 'vehicleUser' },
   interests: [String], // e.g., "Car Modifications", "EV", etc.
   rideDetails: {
@@ -30,7 +45,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['Male', 'Female', 'Transgender'],
   },
-   isVerified: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: false },
   dob: {
     type: Date,
     validate: {
@@ -52,9 +67,37 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    // required: [true, 'Please provide a password'],
-    minlength: 5,
-    select: false,
+    // required: function () {
+    //   return !this.socialLogins || this.socialLogins.length === 0;
+    // },
+    minlength: 6
+  },
+  firstName: {
+    type: String,
+    // required: true,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    // required: true,
+    trim: true
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  isPhoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: String,
+  phoneVerificationToken: String,
+  phoneVerificationExpires: Date,
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
+  profileCompleted: {
+    type: Boolean,
+    default: false
   },
   passwordConfirm: {
     type: String,
@@ -75,7 +118,7 @@ const userSchema = new mongoose.Schema({
     default: false,
     select: false,
   },
-    followersCount: {
+  followersCount: {
     type: Number,
     default: 0,
     min: 0
@@ -103,7 +146,58 @@ const userSchema = new mongoose.Schema({
       select: false,
     },
   ],
+  avatar: String,
+  phone: String,
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: String
+  },
+  preferences: {
+    newsletter: {
+      type: Boolean,
+      default: true
+    },
+    notifications: {
+      type: Boolean,
+      default: true
+    }
+  }
+}, {
+  timestamps: true
 });
+
+// OTP Schema for phone verification
+const otpSchema = new mongoose.Schema({
+  phone: {
+    type: String,
+    required: true
+  },
+  otp: {
+    type: String,
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    expires: 600 // OTP expires after 10 minutes
+  }
+});
+
+
+// Index for username and email
+userSchema.index({ username: 1 }, { unique: true });
+userSchema.index({ email: 1 }, { unique: true });
+
+// Method to update login info
+userSchema.methods.updateLoginInfo = function() {
+  this.loginCount += 1;
+  this.lastLogin = new Date();
+  return this.save();
+};
+
 
 // Virtual populate - parent to child reference
 userSchema.virtual('reviews', {

@@ -20,7 +20,7 @@ const carSchema = new mongoose.Schema({
   fuelType: String,
   location: String,
   image: String,
-  mileage: Number,
+  mileage: Number, 
   isAvailable: {
     type: Boolean,
     default: true,

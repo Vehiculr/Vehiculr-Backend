@@ -202,6 +202,118 @@ user.passwordConfirm = req.body.passwordConfirm;
   createSendToken(user, 200, res);
 });
 
+// PATCH API to update username or create new user
+exports.updateUserProfile = catchAsync(async (req, res, next) => {
+  try {
+    const { username, identifier, password, firstName, lastName, phone } = req.body;
+    let user = await User.findOne({
+      $or: [
+        { email: identifier },
+        { phone: identifier }
+      ]
+    });
+
+    if (user) {
+      // User exists, check if the requested username is available
+      const usernameExists = await User.findOne({ username });
+      if (usernameExists && usernameExists._id.toString() !== user._id.toString()) {
+        return res.status(409).json({
+          message: 'Username already taken by another user'
+        });
+      }
+
+      // Update the username
+     if (username) user.username = username;
+      // Optionally update other fields if provided
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+      }
+      if (firstName) user.firstName = firstName;
+      if (lastName) user.lastName = lastName;
+      if (phone) user.phone = phone;
+
+      await user.save();
+
+      return res.status(200).json({
+        message: 'Username updated successfully',
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isActive: user.isActive
+        }
+      });
+    } else {
+      // User doesn't exist, check if we have enough info to create a new user
+      if (!password || !firstName || !lastName) {
+        return res.status(400).json({
+          message: 'User not found. To create a new user, please provide password, firstName, and lastName'
+        });
+      }
+
+      // Check if email is valid if identifier is an email
+      const isEmail = /^\S+@\S+\.\S+$/.test(identifier);
+      
+      // Create new user
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      const newUser = new User({
+        username,
+        email: isEmail ? identifier : undefined,
+        phone: !isEmail ? identifier : phone,
+        password: hashedPassword,
+        firstName,
+        lastName
+      });
+
+      await newUser.save();
+
+      return res.status(201).json({
+        message: 'User created successfully',
+        user: {
+          id: newUser._id,
+          username: newUser.username,
+          email: newUser.email,
+          phone: newUser.phone,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          isActive: newUser.isActive
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error in PATCH /users/username:', error);
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(409).json({
+        message: `${field} already exists`,
+        field: field
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: errors
+      });
+    }
+
+    res.status(500).json({
+      message: 'Server error while processing user',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 
 exports.requestOTP = async (req, res) => {
   try {

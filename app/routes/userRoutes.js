@@ -19,6 +19,9 @@ router.post('/forgotPassword', authController.forgotPassword);
 router.post("/request-otp", authController.requestOTP);
 router.post("/verify-otp", authController.verifyOTP);
 router.post('/store-password', authController.storeUserPassword);
+router.post("/request-otp", authController.requestOTP);
+router.post("/verify-otp", authController.verifyOTP);
+
 
 // ✅ User routes
 router
@@ -30,6 +33,7 @@ router
 router.get('/getMe', userController.setUserId, userController.getMe());
 router.patch('/updateMe', userController.updateMe);
 router.patch('/updatePassword', authController.updatePassword);
+router.patch('/updateUserProfile', authController.updateUserProfile);
 router.delete('/deleteMe', userController.deleteMe);
 
 router.route('/:id').get(userController.getUser);
