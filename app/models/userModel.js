@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -40,7 +41,26 @@ const userSchema = new mongoose.Schema({
     brands: [String], // e.g., "Honda", "Hyundai"
     tags: [String],   // e.g., "New Vehicle", "Pre-Owned"
   },
-  photo: { type: String, default: 'user-avatar.jpg' },
+  avatar: {
+    public_id: {
+      type: String,
+      default: '',
+    },
+    url: {
+      type: String,
+      default: '',
+    },
+  },
+  coverPhoto: {
+    public_id: {
+      type: String,
+      default: '',
+    },
+    url: {
+      type: String,
+      default: '',
+    },
+  },
   gender: {
     type: String,
     enum: ['Male', 'Female', 'Transgender'],
@@ -146,7 +166,6 @@ const userSchema = new mongoose.Schema({
       select: false,
     },
   ],
-  avatar: String,
   phone: String,
   address: {
     street: String,
@@ -164,7 +183,11 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     }
-  }
+  },
+    topics: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Topic'
+  }],
 }, {
   timestamps: true
 });
@@ -214,6 +237,15 @@ userSchema.pre(/^find/, function (next) {
   });
   next();
 });
+
+// Virtual for getting secure URL
+userSchema.virtual('avatarUrl').get(function() {
+  if (this.avatar.url) {
+    return this.avatar.url.replace('/upload/', '/upload/w_300,h_300,c_fill/');
+  }
+  return '';
+});
+
 
 userSchema.pre('save', async function (next) {
   // Only run this function if password was actually modified
