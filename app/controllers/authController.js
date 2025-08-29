@@ -184,23 +184,47 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   }
 });
 
-exports.updatePassword = catchAsync(async (req, res, next) => {
-  // 1) Get user from collection
-  const user = await User.findById(req.user.id).select('+password');
-// console.log(user)
-// 2) Check if POSTed current password is correct
-if (!(await user.correctPassword(req.body.passwordCurrent, user.password))) {
-  return next(new AppError('Your current password is wrong.', 401));
-}
+exports.updatePassword = async (req, res, next) => {
+  try {
+    const { identifier, password } = req.body;
 
-// 3) Update password
-user.password = req.body.password;
-user.passwordConfirm = req.body.passwordConfirm;
-  await user.save();
-// console.log('==',user)
-  // 4) Send JWT to client
-  createSendToken(user, 200, res);
-});
+    if (!identifier || !password) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Identifier and password are required"
+      });
+    }
+
+    // Find user by phone/identifier
+    const user = await User.findOne({ identifier });
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Phone number not found"
+      });
+    }
+
+    // Check verification
+    if (!user.isVerified) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Phone number not verified"
+      });
+    }
+
+    // Hash and update password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Password updated successfully ✅"
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 // PATCH API to update username or create new user
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
@@ -395,7 +419,7 @@ exports.sendWhatsAppPromotionMessage = async (req, res) => {
   }
 };
 
-
+//storing the password
 exports.storeUserPassword = catchAsync(async (req, res, next) => {
   const { phone, password } = req.body;
 
@@ -482,6 +506,10 @@ exports.updateUsername = catchAsync(async (req, res, next) => {
 });
 
 
+
+
+
+// msg91 integration
 const msg91 = require('../services/msg91Service');
 
 exports.sendOtpToUser = async (req, res, next) => {
@@ -511,4 +539,3 @@ exports.verifyUserOtp = async (req, res, next) => {
     next(new AppError('OTP verification failed', 500));
   }
 };
-
