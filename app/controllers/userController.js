@@ -147,7 +147,7 @@ exports.updateUsername = catchAsync(async (req, res, next) => {
   }
 
   const updatedUser = await User.findByIdAndUpdate(
-    req.user.id,
+    req.user.id, 
     { username },
     { new: true, runValidators: true }
   );
