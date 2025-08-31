@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const axios = require('axios');
 const { promisify } = require('util');
 const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
@@ -22,7 +23,7 @@ const createSendToken = (user, statusCode, res) => {
     expire: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
     httpOnly: true, //can't be accessed or modified by browser
   };
-  // if (process.env.NODE_ENV === 'production') cookieOptions.secure = true; //send cookie only on HTTPS conn.
+  if (process.env.NODE_ENV === 'production') cookieOptions.secure = true; //send cookie only on HTTPS conn.
 
   res.cookie('jwt', token, cookieOptions);
 
@@ -73,17 +74,20 @@ console.log('otpResponse================>>>:', otpResponse.data);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
-  const { email, password } = req.body;
 
+  // const { email, password } = req.body;
+  const { phone } = req.body;
   // 1) Check if email and password exist
   // if (!email || !password) {
   //   return next(new AppError('Please provide email and password!', 400));
   // }
   // 2) Check if user exists && password is correct
-  const user = await User.findOne({ email }).select('+password');
-
-  if (!user || !(await user.correctPassword(password, user.password))) {
-    return next(new AppError('Incorrect email or password', 401));
+  const user = await User.findOne({ phone });
+  // if (!user || !(await user.correctPassword(password, user.password))) {
+  //   return next(new AppError('Incorrect email or password', 401));
+  // }
+  if (!user) {
+    return next(new AppError('Incorrect Phone Number', 401));
   }
 
   // 3) Send JWT to client
@@ -127,7 +131,10 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
 
   // GRANT ACCESS TO PROTECTED ROUTE
-  req.user = currentUser;
+  req.user = {
+      id: currentUser._id,
+      role: currentUser.role,
+    };
   next();
 });
 

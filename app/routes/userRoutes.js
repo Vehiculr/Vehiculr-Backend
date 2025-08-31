@@ -35,7 +35,7 @@ router
 router.get('/getMe', userController.setUserId, userController.getMe());
 router.patch('/updateMe', userController.updateMe);
 router.patch('/updatePassword', authController.updatePassword);
-router.patch('/updateProfilePhoto', upload.single('file'), userController.updateProfilePhoto);
+router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
 router.patch('/updateUserProfile', authController.updateUserProfile);
 router.delete('/deleteMe', userController.deleteMe);
 
