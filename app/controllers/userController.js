@@ -234,7 +234,7 @@ exports.getAllTopics = catchAsync(async (req, res, next) => {
 
 exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
   try {
-    const userId = "68ae1e3d4d3cf2e1c5dda228" || req.user.id;
+    const userId = req.user.id;
 
     if (!req.file) {
       return res.status(400).json({
@@ -272,7 +272,6 @@ exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
         console.error("Error deleting old avatar:", deleteError);
       }
     }
-console.log('==cloudinaryData===', cloudinaryData)
     // Update user with new avatar info
     user.avatar = cloudinaryData;
     await user.save();
