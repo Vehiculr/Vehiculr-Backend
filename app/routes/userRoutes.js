@@ -5,6 +5,11 @@ const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
 const addressController = require('../controllers/addressController');
 const houseRouter = require('./houseRoutes');
+const { checkUsernameExists, updateUsername } = require('../controllers/userController');
+const { protect, restrictTo } = require('../controllers/authController'); // ✅ define protect
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' }); 
+
 
 // ✅ Username check and update (define only once!)
 router.get('/check-username', userController.checkUsernameExists);
@@ -29,13 +34,21 @@ router
 router.get('/getMe', userController.setUserId, userController.getMe());
 router.patch('/updateMe', userController.updateMe);
 router.patch('/updatePassword', authController.updatePassword);
+router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
 router.patch('/updateUserProfile', authController.updateUserProfile);
 router.delete('/deleteMe', userController.deleteMe);
+
 
 router.route('/:id').get(userController.getUser);
 
 // ✅ Houses for owner
 router.route('/me/houses').get(authController.restrictTo('owner'), houseRouter);
+
+router
+  .route('/userTopics')
+  .get(userController.getAllTopics)
+  .post(userController.createTopic)
+
 
 // ✅ Address routes
 router
