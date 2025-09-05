@@ -4,14 +4,42 @@ const router = express.Router({ mergeParams: true });
 const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
 const addressController = require('../controllers/addressController');
+const partnerController = require('../controllers/partnerController'); // NEW: Partner controller
 const houseRouter = require('./houseRoutes');
 const { checkUsernameExists, updateUsername } = require('../controllers/userController');
-const { protect, restrictTo } = require('../controllers/authController'); // ✅ define protect
+const { protect, restrictTo } = require('../controllers/authController');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' }); 
 
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function (req, file, cb) {
+    // Create a unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
+  }
+});
 
-// ✅ Username check and update (define only once!)
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
+
+// ✅ Username check and update
 router.get('/check-username', userController.checkUsernameExists);
 router.patch('/update-username', authController.protect, userController.updateUsername);
 
@@ -32,12 +60,11 @@ router
 
 // ✅ Profile routes
 router.get('/getMe', userController.setUserId, userController.getMe());
-router.patch('/updateMe', userController.updateMe);
-router.patch('/updatePassword', authController.updatePassword);
+router.patch('/updateMe', authController.protect, userController.updateMe);
+router.patch('/updatePassword', authController.protect, authController.updatePassword);
 router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
-router.patch('/updateUserProfile', authController.updateUserProfile);
-router.delete('/deleteMe', userController.deleteMe);
-
+router.patch('/updateUserProfile', authController.protect, authController.updateUserProfile);
+router.delete('/deleteMe', authController.protect, userController.deleteMe);
 
 router.route('/:id').get(userController.getUser);
 
@@ -48,7 +75,6 @@ router
   .route('/userTopics')
   .get(userController.getAllTopics)
   .post(userController.createTopic)
-
 
 // ✅ Address routes
 router

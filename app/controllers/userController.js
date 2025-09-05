@@ -94,7 +94,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
   // 2) Filtered out unwanted fields names that are not allowed to be updated
   const filteredBody = filterObj(req.body, 'id', 'email', 'role');
   if (req.file) filteredBody.photo = req.file.filename;
-// console.log('==filteredBody===', filteredBody)
+  // console.log('==filteredBody===', filteredBody)
   // 3) Update user document
   const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
     new: true,
@@ -132,7 +132,7 @@ exports.checkUsernameExists = async (req, res) => {
   try {
     const { username } = req.query;
     const user = await User.findOne({ username });
-    console.log('username',  req.query)
+    console.log('username', req.query)
 
     if (user) {
       return res.status(200).json({ exists: true, message: 'Username already taken' });
@@ -152,7 +152,7 @@ exports.updateUsername = catchAsync(async (req, res, next) => {
   }
 
   const updatedUser = await User.findByIdAndUpdate(
-    req.user.id, 
+    req.user.id,
     { username },
     { new: true, runValidators: true }
   );
@@ -215,20 +215,21 @@ exports.updateUsername = catchAsync(async (req, res, next) => {
       user: updatedUser,
     },
   });
+})
 
 exports.createTopic = catchAsync(async (req, res, next) => {
   try {
     const { name, description, category, icon } = req.body;
-    
+
     // Check if topic already exists
     const existingTopic = await Topic.findOne({ name: new RegExp(`^${name}$`, 'i') });
-    
+
     if (existingTopic) {
       return res.status(409).json({
         message: 'Topic with this name already exists'
       });
     }
-    
+
     // Create new topic
     const topic = new Topic({
       name,
@@ -237,25 +238,25 @@ exports.createTopic = catchAsync(async (req, res, next) => {
       icon,
       // createdBy: req.user.id // From auth middleware
     });
-    
+
     await topic.save();
-    
+
     // Populate createdBy field for response
     // await topic.populate('createdBy', 'username email');
-    
+
     res.status(201).json({
       message: 'Topic created successfully',
       topic
     });
   } catch (error) {
     console.error('Error in POST /topics:', error);
-    
+
     if (error.code === 11000) {
       return res.status(409).json({
         message: 'Topic with this name already exists'
       });
     }
-    
+
     res.status(500).json({
       message: 'Server error while creating topic',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -268,7 +269,6 @@ exports.createTopic = catchAsync(async (req, res, next) => {
 exports.getAllTopics = catchAsync(async (req, res, next) => {
   try {
     const Topic = await Topic.find();
-    console.log('==Topic===', Topic)
     res.status(200).json({
       status: 'success',
       results: Topic.length,
@@ -291,7 +291,6 @@ exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
     }
 
     const user = await User.findById(userId);
-    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -391,7 +390,7 @@ exports.deleteProfilePhoto = catchAsync(async (req, res, next) => {
 
     // Delete from Cloudinary
     const deleteResult = await deleteFromCloudinary(user.avatar.public_id);
-    
+
     if (deleteResult.result !== 'ok') {
       console.warn('Cloudinary deletion may have failed:', deleteResult);
     }
@@ -485,7 +484,7 @@ exports.getProfilePhoto = catchAsync(async (req, res, next) => {
 exports.updateCoverPhoto = catchAsync(async (req, res, next) => {
   try {
     const userId = req.user.id;
-    
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -494,7 +493,7 @@ exports.updateCoverPhoto = catchAsync(async (req, res, next) => {
     }
 
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -546,7 +545,7 @@ exports.updateCoverPhoto = catchAsync(async (req, res, next) => {
 
   } catch (error) {
     console.error('Error updating cover photo:', error);
-    
+
     // Clean up the uploaded file if something went wrong after upload
     if (req.file && req.file.filename) {
       try {
@@ -591,7 +590,7 @@ exports.deleteCoverPhoto = catchAsync(async (req, res, next) => {
 
     // Delete from Cloudinary
     const deleteResult = await deleteFromCloudinary(user.coverPhoto.public_id);
-    
+
     if (deleteResult.result !== 'ok') {
       console.warn('Cloudinary deletion may have failed:', deleteResult);
     }
@@ -625,4 +624,4 @@ exports.deleteCoverPhoto = catchAsync(async (req, res, next) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
-});
+})
