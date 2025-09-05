@@ -19,7 +19,7 @@ const brandRouter = require('./app/routes/brandRoutes');
 const garageRouter = require('./app/routes/garageRoutes');
 const cityRouter = require('./app/routes/locationRoutes');
 const feedRouter = require('./app/routes/feedRoutes');
-
+const { securityMiddleware } = require('./app/middleware/security');
 //partner Api
 const partnerRouter = require('./app/routes/partnerRoutes');
 
@@ -66,6 +66,8 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.'
 });
+
+securityMiddleware(app); // Add security middleware
 
 app.use('/api', limiter);
 

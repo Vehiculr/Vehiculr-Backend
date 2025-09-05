@@ -8,16 +8,16 @@ const kycSchema = new mongoose.Schema({
   },
   fullName: {
     type: String,
-    required: true
+    // required: true
   },
   documentNumber: {
     type: String,
-    required: true,
-    unique: true
+    // required: true,
+    // unique: true
   },
   address: {
     type: String,
-    required: true
+    // required: true
   },
   verified: {
     type: Boolean,
@@ -26,21 +26,27 @@ const kycSchema = new mongoose.Schema({
 }, { _id: false });
 
 const partnerSchema = new mongoose.Schema({
-  name: {
+  fullName: {
     type: String,
-    required: [true, 'Please tell us your name!'],
+    // required: [true, 'Please tell us your name!'],
   },
-  shopName: {
+    businessName: {
     type: String,
-    required: [true, 'Please provide your shop name!'],
+    // required: [true, 'Please tell us your name!'],
   },
-  address: { 
-    type: String,
-    required: [true, 'Please provide your address!'],
+ shopLocation: {
+    type: {
+      type: String,
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number],
+      required: [false, 'Garage must have coordinates!'], // [longitude, latitude]
+    },
   },
   phone: { 
     type: String,
-    required: [true, 'Please provide your phone number!'],
+    // required: [true, 'Please provide your phone number!'],
     unique: true,
     match: [/^\+91[0-9]{10}$/, 'Please enter a valid Indian phone number with +91']
   },

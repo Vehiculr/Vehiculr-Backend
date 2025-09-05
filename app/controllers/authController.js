@@ -4,6 +4,7 @@ const axios = require('axios');
 const { promisify } = require('util');
 const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
+const Partner = require('../models/partnerModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const sendEmail = require('../utils/email');
@@ -17,8 +18,9 @@ const signToken = (id) => {
   });
 };
 
-const createSendToken = (user, statusCode, res) => {
-  const token = signToken(user._id);
+const createSendToken = (account, statusCode, res) => {
+  console.log('user in createSendToken:', account);
+  const token = signToken(account._id);
   const cookieOptions = {
     expire: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
     httpOnly: true, //can't be accessed or modified by browser
@@ -27,24 +29,25 @@ const createSendToken = (user, statusCode, res) => {
 
   res.cookie('jwt', token, cookieOptions);
 
-  user.password = undefined; // Remove password field from created User
+  // user.password = undefined; // Remove password field from created User
+  console.log('token:', token);
 
   res.status(statusCode).json({
     status: 'success',
     token,
     data: {
-      user,
+      account,
     },
   });
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-   const { phone } = req.body;
+  const { phone } = req.body;
 
-   if (!phone) return res.status(400).json({ message: 'Mobile number is required' });
-   
-   let user = await User.findOne({ phone });
-   console.log('user:', user);
+  if (!phone) return res.status(400).json({ message: 'Mobile number is required' });
+
+  let user = await User.findOne({ phone });
+  console.log('user:', user);
 
   if (user && user.isVerified) {
     return res.status(400).json({ message: 'Mobile already registered' });
@@ -65,7 +68,7 @@ exports.signup = catchAsync(async (req, res, next) => {
       user = new User({ phone });
       await user.save();
     }
-console.log('otpResponse================>>>:', otpResponse.data);
+    console.log('otpResponse================>>>:', otpResponse.data);
     res.status(200).json({ message: 'OTP sent successfully', data: otpResponse.data });
   } catch (error) {
     res.status(500).json({ message: 'OTP sending failed', error: error.response?.data || error.message });
@@ -74,24 +77,24 @@ console.log('otpResponse================>>>:', otpResponse.data);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
-
-  // const { email, password } = req.body;
   const { phone } = req.body;
-  // 1) Check if email and password exist
-  // if (!email || !password) {
-  //   return next(new AppError('Please provide email and password!', 400));
-  // }
-  // 2) Check if user exists && password is correct
-  const user = await User.findOne({ phone });
-  // if (!user || !(await user.correctPassword(password, user.password))) {
-  //   return next(new AppError('Incorrect email or password', 401));
-  // }
-  if (!user) {
-    return next(new AppError('Incorrect Phone Number', 401));
-  }
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ phone }),
+    Partner.findOne({ phone })
+  ]);
 
+  const account = foundUser || foundPartner;
+
+  console.log('account:', account);
+
+  if (!account) {
+    return res.status(404).json({
+      success: false,
+      message: "User or Partner not found",
+    });
+  }
   // 3) Send JWT to client
-  createSendToken(user, 200, res);
+  createSendToken(account, 200, res);
 });
 
 exports.logout = (req, res) => {
@@ -110,31 +113,37 @@ exports.protect = catchAsync(async (req, res, next) => {
   } else if (req.cookies.jwt) {
     token = req.cookies.jwt;
   }
-  
+
   if (!token) {
     return next(new AppError('You are not logged in! Please log in to get access.', 401));
   }
-         
+
   // 2) Token Verification - payload & expiry
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
-  // 3) Check if user still exists
-  const currentUser = await User.findById(decoded.id);
+  let id = decoded.id; // already a string from your token
 
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findById(id),
+    Partner.findById(id)
+  ]);
+
+  const currentUser = foundUser || foundPartner;
+  // 3) Check if user still exists
   if (!currentUser) {
     return next(new AppError('The user belonging to this token does no longer exist.', 401));
   }
 
   // 4) Check if user changed password after the token was issued
-  if (currentUser.changedPasswordAfter(decoded.iat)) {
-    return next(new AppError('User recently changed password! Please log in again.', 401));
-  }
+  // if (currentUser.changedPasswordAfter(currentUser.)) {
+  //   return next(new AppError('User recently changed password! Please log in again.', 401));
+  // }
 
   // GRANT ACCESS TO PROTECTED ROUTE
   req.user = {
-      id: currentUser._id,
-      role: currentUser.role,
-    };
+    id: currentUser._id,
+    role: currentUser.role,
+  };
   next();
 });
 
@@ -193,21 +202,22 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
 
 exports.updatePassword = async (req, res, next) => {
   try {
-    const { identifier, password } = req.body;
+    const userId = req.user.id;
+    const { password } = req.body;
 
-    if (!identifier || !password) {
+    if (!password) {
       return res.status(400).json({
         status: "fail",
-        message: "Identifier and password are required"
+        message: "Password required"
       });
     }
 
     // Find user by phone/identifier
-    const user = await User.findOne({ identifier });
+    const user = await User.findOne({ userId });
     if (!user) {
       return res.status(404).json({
         status: "fail",
-        message: "Phone number not found"
+        message: "User not found"
       });
     }
 
@@ -236,13 +246,16 @@ exports.updatePassword = async (req, res, next) => {
 // PATCH API to update username or create new user
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
   try {
-    const { username, identifier, password, firstName, lastName, phone } = req.body;
-    let user = await User.findOne({
-      $or: [
-        { email: identifier },
-        { phone: identifier }
-      ]
-    });
+    const { username, password, firstName, lastName, phone } = req.body;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
     if (user) {
       // User exists, check if the requested username is available
@@ -254,7 +267,7 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
       }
 
       // Update the username
-     if (username) user.username = username;
+      if (username) user.username = username;
       // Optionally update other fields if provided
       if (password) {
         const salt = await bcrypt.genSalt(10);
@@ -288,7 +301,7 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
 
       // Check if email is valid if identifier is an email
       const isEmail = /^\S+@\S+\.\S+$/.test(identifier);
-      
+
       // Create new user
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
@@ -385,7 +398,7 @@ exports.verifyOTP = async (req, res) => {
     // if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
     //   return res.status(400).json({ message: "Invalid or expired OTP" });
     // }
-console.log('user:', user);
+    console.log('user:', user);
     user.isVerified = true;
     user.otp = undefined;
     user.otpExpires = undefined;
