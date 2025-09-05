@@ -625,3 +625,40 @@ exports.deleteCoverPhoto = catchAsync(async (req, res, next) => {
     });
   }
 })
+// PATCH controller for adding vehicles
+exports.updateVehicles = catchAsync(async (req, res, next) => {
+  try {
+    const userId = req.user.id; // taken from token (protect middleware)
+    const { bikes, cars } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        $addToSet: {
+          bikes: { $each: bikes || [] },
+          cars: { $each: cars || [] }
+        }
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Vehicles updated successfully!",
+      data: user,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating vehicles",
+      error: err.message,
+    });
+  }
+});

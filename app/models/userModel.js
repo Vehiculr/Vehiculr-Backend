@@ -188,6 +188,14 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Topic'
   }],
+  bikes: {
+  type: [String],
+  default: []
+},
+cars: {
+  type: [String],
+  default: []
+},
 }, {
   timestamps: true
 });

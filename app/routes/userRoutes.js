@@ -10,6 +10,7 @@ const { checkUsernameExists, updateUsername } = require('../controllers/userCont
 const { protect, restrictTo } = require('../controllers/authController');
 const multer = require('multer');
 
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -65,6 +66,7 @@ router.patch('/updatePassword', authController.protect, authController.updatePas
 router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
 router.patch('/updateUserProfile', authController.protect, authController.updateUserProfile);
 router.delete('/deleteMe', authController.protect, userController.deleteMe);
+router.patch('/updateVehicles',authController.protect,userController.updateVehicles);
 
 router.route('/:id').get(userController.getUser);
 
