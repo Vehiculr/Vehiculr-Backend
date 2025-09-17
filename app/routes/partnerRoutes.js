@@ -10,10 +10,41 @@ const { protect, restrictTo } = authController;
 const publicQrController = require('../controllers/publicQrController');
 const { validateBrandSelection } = require('../valiations/brandValidation');
 
+const multer = require('multer');
 
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function (req, file, cb) {
+    // Create a unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
 
 
 router.use(apiLimiter);
+
 
 // Routes
 router.post('/', partnerController.createPartner);
@@ -56,6 +87,8 @@ router.patch('/updatePartnerBrands',
   validateBrandSelection,
   partnerController.updatePartnerBrands
 );
+
+router.patch('/uploadShopPhotos', upload.array('photos', 4), authController.protect, partnerController.uploadShopPhotos);
 
 // QR Code generation route
 // router.get('/qr-code',

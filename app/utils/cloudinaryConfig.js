@@ -73,14 +73,20 @@ const uploadCoverPhoto = multer({
 });
 
 // Enhanced upload function
-const uploadToCloudinary = async (filePath, options = {}) => {
+const uploadToCloudinary = async (file, options = {}) => {
   try {
-    const result = await cloudinary.uploader.upload(filePath.path, {
-      folder: options.folder || 'app-name',
-      transformation: options.transformation,
-      resource_type: 'image',
+    // Handle both file object and file path
+    const filePath = file.path || file;
+    const uploadOptions = {
+      folder: options.folder || 'partner-shop-photos',
+      transformation: [
+        { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
+      ],
+      resource_type: 'auto',
       ...options,
-    });
+    };
+
+    const result = await cloudinary.uploader.upload(filePath, uploadOptions);
     
     return {
       public_id: result.public_id,
@@ -90,6 +96,7 @@ const uploadToCloudinary = async (filePath, options = {}) => {
       width: result.width,
       height: result.height,
       created_at: result.created_at,
+      resource_type: result.resource_type
     };
   } catch (error) {
     throw new Error('Cloudinary upload failed: ' + error.message);

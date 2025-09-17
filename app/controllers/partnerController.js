@@ -2,6 +2,10 @@ const Partner = require('../models/partnerModel');
 const Brand = require('../models/brandModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
+const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
+const cloudinary = require("cloudinary").v2;
+const multer = require('multer');
 const { carBrands, bikeBrands } = require('../valiations/brandValidation');
 const {
   generateQRData,
@@ -264,7 +268,7 @@ exports.getAvailableBrands = catchAsync(async (req, res, next) => {
   });
 });
 
-// Update partner brands (PATCH)
+// Update partner brands
 exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
   console.log('Request body:', partner); 
@@ -368,26 +372,148 @@ exports.checkBrandLimit = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
-  if (!req.files || req.files.length === 0) {
-    return next(new AppError('Please upload at least one photo', 400));
+const uploadMultipleToCloudinary = async (files, options = {}) => {
+  try {
+    const uploadPromises = files.map(file => 
+      uploadToCloudinary(file, options)
+    );
+    
+    return await Promise.all(uploadPromises);
+  } catch (error) {
+    throw new Error('Batch Cloudinary upload failed: ' + error.message);
   }
+};
 
-  const photoPaths = req.files.map(file => file.path);
-  const partner = await Partner.findByIdAndUpdate(
-    req.user.id,
-    {
-      $push: { shopPhotos: { $each: photoPaths } },
-      onboardingStatus: 'photos_uploaded'
-    },
-    { new: true }
-  );
+exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
+ try {
+    const partnerId = req.user.id;
 
-  res.status(200).json({
-    success: true,
-    message: 'Shop photos uploaded successfully',
-    data: { photos: photoPaths }
-  });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one image to upload",
+      });
+    }
+
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        message: "Partner not found",
+      });
+    }
+
+    // Check current photo count
+    const currentPhotoCount = partner.shopPhotos ? partner.shopPhotos.length : 0;
+    const newPhotoCount = req.files.length;
+    
+    if (currentPhotoCount + newPhotoCount > 4) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum 4 photos allowed. You already have ${currentPhotoCount} photos and trying to add ${newPhotoCount} more.`,
+      });
+    }
+
+    // Upload all files to Cloudinary
+    const uploadResults = await uploadMultipleToCloudinary(req.files, {
+      folder: 'partner-shop-photos',
+      transformation: [
+        { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
+      ]
+    });
+
+    const cloudinaryDataArray = uploadResults.map(result => ({
+      public_id: result.public_id,
+      url: result.url,
+      format: result.format,
+      bytes: result.bytes,
+      width: result.width,
+      height: result.height,
+      created_at: result.created_at,
+      resource_type: result.resource_type
+    }));
+
+    // Initialize shopPhotos array if it doesn't exist
+    if (!partner.shopPhotos) {
+      partner.shopPhotos = [];
+    }
+
+    // Add new photos to existing ones
+    partner.shopPhotos = [...partner.shopPhotos, ...cloudinaryDataArray];
+    
+    // Ensure we don't exceed 4 photos (safety check)
+    if (partner.shopPhotos.length > 4) {
+      // Delete the excess photos from Cloudinary
+      const excessPhotos = partner.shopPhotos.slice(4);
+      for (const photo of excessPhotos) {
+        try {
+          await cloudinary.uploader.destroy(photo.public_id);
+        } catch (deleteError) {
+          console.error("Error deleting excess photo:", deleteError);
+        }
+      }
+      // Keep only first 4 photos
+      partner.shopPhotos = partner.shopPhotos.slice(0, 4);
+    }
+
+    await partner.save();
+
+    // Generate optimized URLs for all photos
+    const optimizedPhotos = partner.shopPhotos.map(photo => ({
+      id: photo.public_id,
+      original: photo.url,
+      thumbnail: cloudinary.url(photo.public_id, {
+        width: 150,
+        height: 150,
+        crop: "fill",
+        quality: "auto"
+      }),
+      medium: cloudinary.url(photo.public_id, {
+        width: 400,
+        height: 300,
+        crop: "fill",
+        quality: "auto"
+      }),
+      large: cloudinary.url(photo.public_id, {
+        width: 800,
+        height: 600,
+        crop: "limit",
+        quality: "auto"
+      })
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Shop photos uploaded successfully",
+      data: {
+        total_photos: partner.shopPhotos.length,
+        uploaded_count: uploadResults.length,
+        photos: optimizedPhotos,
+        max_allowed: 4
+      },
+    });
+  } catch (error) {
+    console.error("Error uploading shop photos:", error);
+
+    // Clean up: Delete any uploaded files if error occurs
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        if (file.filename) { // If files were uploaded to Cloudinary
+          try {
+            await cloudinary.uploader.destroy(file.filename);
+          } catch (cleanupError) {
+            console.error("Error cleaning up file:", cleanupError);
+          }
+        }
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Server error while uploading shop photos",
+      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error",
+    });
+  }
 });
 
 // Send WhatsApp OTP
