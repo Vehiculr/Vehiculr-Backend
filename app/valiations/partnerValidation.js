@@ -29,7 +29,7 @@ const validateKYC = [
 
 const validateBrands = [
   body('brandIds')
-    .isArray({ min: 1, max: 10 })
+    .isArray({ min: 1, max: 50 })
     .withMessage('You must select between 1 and 10 brands')
     .custom((value) => {
       if (new Set(value).size !== value.length) {

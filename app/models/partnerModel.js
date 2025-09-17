@@ -80,7 +80,7 @@ const partnerSchema = new mongoose.Schema({
   
   maxFreeBrands: {
     type: Number,
-    default: 10
+    default: 50   // brand limit befeoreIncreased limit for free accounts
   }
 
 }, { timestamps: true });
