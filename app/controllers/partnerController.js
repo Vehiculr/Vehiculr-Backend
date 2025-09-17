@@ -207,8 +207,8 @@ exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
 
   // Check if partner is premium or within free tier limits
-  if (!partner.isPremium && req.body.brandIds.length > 10) {
-    return next(new AppError('Free accounts can only select up to 10 brands. Upgrade to premium for more.', 400));
+  if (!partner.isPremium && req.body.brandIds.length > 50) {
+    return next(new AppError('Free accounts can only select up to 50 brands. Upgrade to premium for more.', 400));
   }
 
   partner.brands = req.body.brandIds;
