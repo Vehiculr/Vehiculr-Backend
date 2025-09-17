@@ -8,6 +8,7 @@ const validation = require('../valiations/qrValidation');
 const rateLimit = require('express-rate-limit');
 const { protect, restrictTo } = authController;
 const publicQrController = require('../controllers/publicQrController');
+const { validateBrandSelection } = require('../valiations/brandValidation');
 
 
 
@@ -17,6 +18,7 @@ router.use(apiLimiter);
 // Routes
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
+router.get('/brandsAvailable', partnerController.getAvailableBrands);
 router.get('/:id', partnerController.getPartnerById);
 router.get('/qr-code', partnerController.getQRCode);
 // New KYC verification route
@@ -33,6 +35,27 @@ router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 // ✅ Partner-specific auth
 router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
 router.post('/verify-otp', otpLimiter, validateOTPVerification, authController.verifyOTP);
+
+// Brands and Services routes
+router.get('/my-brands',
+  protect,
+  restrictTo('partner'),
+  partnerController.getPartnerBrands
+);
+
+router.get('/check-limit',
+  protect,
+  restrictTo('partner'),
+  partnerController.checkBrandLimit
+);
+
+// PATCH route for updating brands
+router.patch('/updatePartnerBrands',
+  protect,
+  // restrictTo('partner'),
+  validateBrandSelection,
+  partnerController.updatePartnerBrands
+);
 
 // QR Code generation route
 // router.get('/qr-code',

@@ -2,6 +2,7 @@ const Partner = require('../models/partnerModel');
 const Brand = require('../models/brandModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { carBrands, bikeBrands } = require('../valiations/brandValidation');
 const {
   generateQRData,
   generateQRImage,
@@ -206,8 +207,8 @@ exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
 
   // Check if partner is premium or within free tier limits
-  if (!partner.isPremium && req.body.brandIds.length > 3) {
-    return next(new AppError('Free accounts can only select up to 3 brands. Upgrade to premium for more.', 400));
+  if (!partner.isPremium && req.body.brandIds.length > 10) {
+    return next(new AppError('Free accounts can only select up to 10 brands. Upgrade to premium for more.', 400));
   }
 
   partner.brands = req.body.brandIds;
@@ -248,6 +249,122 @@ exports.submitKYC = catchAsync(async (req, res, next) => {
     success: true,
     message: 'KYC submitted successfully and under review',
     data: { partner }
+  });
+});
+
+// Get available brands
+exports.getAvailableBrands = catchAsync(async (req, res, next) => {
+  console.log('Available car brands:');
+  res.status(200).json({
+    success: true,
+    data: {
+      carBrands,
+      bikeBrands
+    }
+  });
+});
+
+// Update partner brands (PATCH)
+exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
+  const partner = await Partner.findById(req.user.id);
+  console.log('Request body:', partner); 
+  
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  const { carBrands: newCarBrands, bikeBrands: newBikeBrands } = req.body;
+  
+
+   // Initialize brands object if it doesn't exist
+  if (!partner.brands) {
+    partner.brands = {
+      carBrands: [],
+      bikeBrands: []
+    };
+  }
+  
+   // Calculate total selected brands
+  const currentCarBrands = newCarBrands !== undefined ? newCarBrands : (partner.brands.carBrands || []);
+  const currentBikeBrands = newBikeBrands !== undefined ? newBikeBrands : (partner.brands.bikeBrands || []);
+  
+  const totalSelectedBrands = currentCarBrands.length + currentBikeBrands.length;
+
+  // Check if partner exceeds free tier limit
+  if (!partner.isPremium && totalSelectedBrands > partner.maxFreeBrands) {
+    return next(new AppError(
+      `Free accounts can only select up to ${partner.maxFreeBrands} brands total. Upgrade to premium for unlimited brands.`,
+      400
+    ));
+  }
+
+  // Update brands (only the fields that were provided)
+  if (newCarBrands !== undefined) {
+    partner.brands.carBrands = newCarBrands;
+  }
+  
+  if (newBikeBrands !== undefined) {
+    partner.brands.bikeBrands = newBikeBrands;
+  }
+
+  await partner.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Brands updated successfully',
+    data: {
+      brands: partner.brands,
+      isPremium: partner.isPremium,
+      maxFreeBrands: partner.maxFreeBrands,
+      totalSelected: totalSelectedBrands,
+      canSelectMore: partner.isPremium || totalSelectedBrands <= partner.maxFreeBrands
+    }
+  });
+});
+
+// Get partner's current brand selection
+exports.getPartnerBrands = catchAsync(async (req, res, next) => {
+  const partner = await Partner.findById(req.user.id).select('brands isPremium maxFreeBrands');
+  
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  const totalSelected = partner.brands.carBrands.length + partner.brands.bikeBrands.length;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      brands: partner.brands,
+      isPremium: partner.isPremium,
+      maxFreeBrands: partner.maxFreeBrands,
+      totalSelected: totalSelected,
+      canSelectMore: partner.isPremium || totalSelected < partner.maxFreeBrands,
+      availableSlots: partner.isPremium ? 'Unlimited' : partner.maxFreeBrands - totalSelected
+    }
+  });
+});
+
+// Check if partner can select more brands
+exports.checkBrandLimit = catchAsync(async (req, res, next) => {
+  const partner = await Partner.findById(req.user.id).select('brands isPremium maxFreeBrands');
+  
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  const totalSelected = partner.brands.carBrands.length + partner.brands.bikeBrands.length;
+  const availableSlots = partner.isPremium ? 'unlimited' : partner.maxFreeBrands - totalSelected;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      canSelectMore: partner.isPremium || totalSelected < partner.maxFreeBrands,
+      availableSlots: availableSlots,
+      isPremium: partner.isPremium,
+      totalSelected: totalSelected,
+      maxFreeBrands: partner.maxFreeBrands
+    }
   });
 });
 

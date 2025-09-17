@@ -29,8 +29,8 @@ const validateKYC = [
 
 const validateBrands = [
   body('brandIds')
-    .isArray({ min: 1, max: 3 })
-    .withMessage('You must select between 1 and 3 brands')
+    .isArray({ min: 1, max: 10 })
+    .withMessage('You must select between 1 and 10 brands')
     .custom((value) => {
       if (new Set(value).size !== value.length) {
         throw new Error('Duplicate brands are not allowed');

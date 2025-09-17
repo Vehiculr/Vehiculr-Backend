@@ -8,16 +8,12 @@ const kycSchema = new mongoose.Schema({
   },
   fullName: {
     type: String,
-    // required: true
   },
   documentNumber: {
     type: String,
-    // required: true,
-    // unique: true
   },
   address: {
     type: String,
-    // required: true
   },
   verified: {
     type: Boolean,
@@ -25,33 +21,45 @@ const kycSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+// Define the brands schema separately
+const brandsSchema = new mongoose.Schema({
+  carBrands: [{
+    type: String,
+    enum: ['Audi', 'BMW', 'Chevrolet', 'Ford', 'Hyundai', 'Honda', 'Jeep', 'Kia', 
+           'Mahindra', 'Morris Garages', 'Nissan', 'Renault', 'Skoda', 'Suzuki', 
+           'Tata Motors', 'Toyota']
+  }],
+  bikeBrands: [{
+    type: String,
+    enum: ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS', 'Honda', 'Yamaha', 
+           'Kawasaki', 'Ducati', 'Benelli', 'BMW']
+  }]
+}, { _id: false });
+
 const partnerSchema = new mongoose.Schema({
   garageId: {
     type: String,
     unique: true,
-    sparse: true // Allows null values but ensures uniqueness for non-null
+    sparse: true
   },
   fullName: {
     type: String,
-    // required: [true, 'Please tell us your name!'],
   },
-    businessName: {
+  businessName: {
     type: String,
-    // required: [true, 'Please tell us your name!'],
   },
- shopLocation: {
+  shopLocation: {
     type: {
       type: String,
       default: 'Point',
     },
     coordinates: {
       type: [Number],
-      required: [false, 'Garage must have coordinates!'], // [longitude, latitude]
+      required: false,
     },
   },
   phone: { 
     type: String,
-    // required: [true, 'Please provide your phone number!'],
     unique: true,
     match: [/^\+91[0-9]{10}$/, 'Please enter a valid Indian phone number with +91']
   },
@@ -60,14 +68,38 @@ const partnerSchema = new mongoose.Schema({
     enum: ['Off-Roads', 'Vintages', 'Luxury Automobile'],
     default: []
   },
-  kyc: kycSchema // ✅ Added KYC support
+  kyc: kycSchema,
+  
+  // CORRECTED: Use the brandsSchema
+  brands: brandsSchema,
+  
+  isPremium: {
+    type: Boolean,
+    default: false
+  },
+  
+  maxFreeBrands: {
+    type: Number,
+    default: 10
+  }
+
 }, { timestamps: true });
 
-// Generate garage ID before saving if not exists
+// Add pre-save hook to initialize brands
 partnerSchema.pre('save', function(next) {
+  // Initialize garageId if not exists
   if (!this.garageId && this._id) {
     this.garageId = `GAR${this._id.toString().slice(-5).toUpperCase()}`;
   }
+  
+  // Initialize brands object if not exists
+  if (!this.brands) {
+    this.brands = {
+      carBrands: [],
+      bikeBrands: []
+    };
+  }
+  
   next();
 });
 
