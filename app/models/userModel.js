@@ -119,7 +119,7 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  passwordConfirm: {
+  confirmPassword: {
     type: String,
     // required: [true, 'Please confirm your password'],
     validate: {
@@ -184,7 +184,7 @@ const userSchema = new mongoose.Schema({
       default: true
     }
   },
-    topics: [{
+  topics: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Topic'
   }],
@@ -215,7 +215,7 @@ userSchema.index({ username: 1 }, { unique: true });
 userSchema.index({ email: 1 }, { unique: true });
 
 // Method to update login info
-userSchema.methods.updateLoginInfo = function() {
+userSchema.methods.updateLoginInfo = function () {
   this.loginCount += 1;
   this.lastLogin = new Date();
   return this.save();
@@ -239,7 +239,7 @@ userSchema.pre(/^find/, function (next) {
 });
 
 // Virtual for getting secure URL
-userSchema.virtual('avatarUrl').get(function() {
+userSchema.virtual('avatarUrl').get(function () {
   if (this.avatar.url) {
     return this.avatar.url.replace('/upload/', '/upload/w_300,h_300,c_fill/');
   }
@@ -254,8 +254,8 @@ userSchema.pre('save', async function (next) {
   // Hash the password with cost of 12
   this.password = await bcrypt.hash(this.password, 12);
 
-  //Delete passwordConfirm field / Don't persist in Db
-  this.passwordConfirm = undefined;
+  //Delete confirmPassword field / Don't persist in Db
+  this.confirmPassword = undefined;
   next();
 });
 

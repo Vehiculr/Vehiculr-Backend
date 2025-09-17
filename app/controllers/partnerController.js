@@ -1,12 +1,23 @@
 const Partner = require('../models/partnerModel');
 const Brand = require('../models/brandModel');
-// const Service = require('../models/serviceModel');
-// const PremiumPlan = require('../models/premiumPlanModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const {
+  generateQRData,
+  generateQRImage,
+  generateAndSaveQR,
+  generateQRFileName,
+  decodeQRData,
+  generateReadableQR,
+  generatePublicQR,
+  generateDisplayUrl
+} = require('../utils/qrGenerator');
+const path = require('path');
+const fs = require('fs');
 // const { generateQRCode } = require('../utils/qrGenerator');
 // const { sendWhatsAppOTP } = require('../utils/notificationService');
-
+// const Service = require('../models/serviceModel');
+// const PremiumPlan = require('../models/premiumPlanModel');
 
 // CREATE a new partner
 exports.createPartner = async (req, res) => {
@@ -410,4 +421,234 @@ exports.getPartnerFeed = catchAsync(async (req, res, next) => {
     success: true,
     data: { feed: feedPosts }
   });
+});
+
+
+// Generate QR code for partner
+exports.generateQRCode = catchAsync(async (req, res, next) => {
+   const partner = await Partner.findById(req.user.id);
+  
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  // Ensure garageId exists
+  if (!partner.garageId) {
+    partner.garageId = `GAR${partner._id.toString().slice(-5).toUpperCase()}`;
+    await partner.save();
+  }
+
+  // Generate PUBLIC QR code (scannable by any device)
+  const { publicUrl, qrImageDataUrl } = await generatePublicQR(partner, {
+    width: 300,
+    margin: 2
+  });
+
+  const displayUrl = generateDisplayUrl(partner);
+
+  // Store QR data in partner document
+  partner.qrCode = {
+    publicUrl: publicUrl,
+    displayUrl: displayUrl,
+    qrImageData: qrImageDataUrl,
+    generatedAt: new Date(),
+    lastUpdated: new Date()
+  };
+
+  await partner.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'QR code generated successfully',
+    data: {
+      // QR code image (base64)
+      qrImageDataUrl: qrImageDataUrl,
+      
+      // Public URL that anyone can scan
+      publicUrl: publicUrl,
+      
+      // Nice display URL to show users
+      displayUrl: displayUrl,
+      
+      // Partner information
+      partner: {
+        garageId: partner.garageId,
+        businessName: partner.businessName,
+        phoneNumber: partner.phoneNumber
+      },
+      
+      // Instructions for use
+      scanInstructions: {
+        message: "This QR code can be scanned by ANY QR scanner app",
+        example: `Scanning will open: ${displayUrl}`
+      }
+    }
+  });
+});
+
+// Download QR code as image file
+exports.downloadQRCode = catchAsync(async (req, res, next) => {
+  const partner = await Partner.findById(req.user.id);
+
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  const format = req.query.format || 'png';
+  const fileName = generateQRFileName(partner._id, format);
+  const filePath = path.join(__dirname, '../public/qr-codes', fileName);
+
+  // Generate and save QR code
+  const qrResult = await generateAndSaveQR(partner, filePath, {
+    type: format,
+    width: 400,
+    margin: 3
+  });
+
+  // Set appropriate headers for download
+  res.setHeader('Content-Type', `image/${format}`);
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+  // Stream the file to response
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
+
+  // Clean up file after sending (optional)
+  fileStream.on('close', () => {
+    // You might want to keep the file for caching
+    // fs.unlinkSync(filePath);
+  });
+});
+
+// Get QR code information (for display)
+exports.getQRCodeInfo = catchAsync(async (req, res, next) => {
+  const partner = await Partner.findById(req.user.id);
+
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  // Generate garage ID if not exists
+  if (!partner.garageId) {
+    partner.garageId = `GAR${partner._id.toString().slice(-5).toUpperCase()}`;
+    await partner.save();
+  }
+
+  const qrData = generateQRData(partner);
+  const qrImageDataUrl = await generateQRImage(qrData);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      garageId: partner.garageId,
+      businessName: partner.businessName,
+      phoneNumber: partner.phoneNumber,
+      qrCodeImage: qrImageDataUrl,
+      downloadUrl: `/api/partner/qr-code/download?format=png`,
+      printUrl: `/api/partner/qr-code/download?format=svg` // SVG better for printing
+    }
+  });
+});
+
+// Print QR code (higher resolution)
+exports.printQRCode = catchAsync(async (req, res, next) => {
+  const partner = await Partner.findById(req.user.id);
+
+  if (!partner) {
+    return next(new AppError('Partner not found', 404));
+  }
+
+  const format = req.query.format || 'svg'; // SVG is better for printing
+  const fileName = generateQRFileName(partner._id, format);
+  const filePath = path.join(__dirname, '../public/qr-codes', fileName);
+
+  // Generate high-resolution QR code for printing
+  const qrResult = await generateAndSaveQR(partner, filePath, {
+    type: format,
+    width: 600, // Higher resolution for printing
+    margin: 4,
+    scale: 8 // Higher scale for better print quality
+  });
+
+  res.setHeader('Content-Type', format === 'svg' ? 'image/svg+xml' : `image/${format}`);
+  res.setHeader('Content-Disposition', `inline; filename="print_${fileName}"`);
+
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
+});
+
+// Scan QR code (decode partner information)
+exports.scanQRCode = catchAsync(async (req, res, next) => {
+  const { qrData } = req.body;
+
+  if (!qrData) {
+    return next(new AppError('QR code data is required', 400));
+  }
+
+  try {
+    // Decode the QR data
+    const decodedData = decodeQRData(qrData);
+
+    // Get partner information
+    const partner = await Partner.findById(decodedData.partnerId)
+      .select('businessName phoneNumber garageId address services brands isPremium');
+
+    if (!partner) {
+      return next(new AppError('Partner not found', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        partner,
+        scanTime: new Date(),
+        qrData: decodedData
+      }
+    });
+  } catch (error) {
+    return next(new AppError('Invalid QR code', 400));
+  }
+});
+
+// Verify QR code validity
+exports.verifyQRCode = catchAsync(async (req, res, next) => {
+  const { qrData } = req.body;
+
+  if (!qrData) {
+    return next(new AppError('QR code data is required', 400));
+  }
+
+  try {
+    const decodedData = decodeQRData(qrData);
+
+    // Check if QR code is not too old (optional)
+    const qrAge = Date.now() - decodedData.timestamp;
+    const maxAge = 365 * 24 * 60 * 60 * 1000; // 1 year
+
+    if (qrAge > maxAge) {
+      return res.status(200).json({
+        success: false,
+        message: 'QR code has expired'
+      });
+    }
+
+    const partner = await Partner.findById(decodedData.partnerId);
+
+    res.status(200).json({
+      success: true,
+      valid: !!partner,
+      message: partner ? 'Valid QR code' : 'Invalid QR code',
+      data: {
+        partnerId: decodedData.partnerId,
+        garageId: decodedData.garageId,
+        timestamp: new Date(decodedData.timestamp)
+      }
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: false,
+      valid: false,
+      message: 'Invalid QR code format'
+    });
+  }
 });

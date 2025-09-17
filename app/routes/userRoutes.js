@@ -31,7 +31,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
@@ -59,17 +59,15 @@ router
   .post(userController.createUser);
 
 // ✅ Profile routes
+router.route('/:id').get(userController.getUser);
 router.get('/getMe', userController.setUserId, userController.getMe());
-router.patch('/updateMe', authController.protect, userController.updateMe);
+router.patch('/createPassword', authController.protect, userController.createPassword);
 router.patch('/updatePassword', authController.protect, authController.updatePassword);
 router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
 router.patch('/updateUserProfile', authController.protect, authController.updateUserProfile);
 router.delete('/deleteMe', authController.protect, userController.deleteMe);
 
-router.route('/:id').get(userController.getUser);
 
-// ✅ Houses for owner
-router.route('/me/houses').get(authController.restrictTo('owner'), houseRouter);
 
 router
   .route('/userTopics')
@@ -83,5 +81,7 @@ router
   .post(addressController.createAddress, userController.saveUserAddress)
   .patch(userController.getUserAddress, addressController.updateAddress)
   .delete(userController.getUserAddress, addressController.deleteAddress);
+// ✅ Houses for owner
+router.route('/me/houses').get(authController.restrictTo('owner'), houseRouter);
 
 module.exports = router;

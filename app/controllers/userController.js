@@ -85,17 +85,35 @@ exports.getMe = () => {
   return factory.getOne(User);
 };
 
-exports.updateMe = catchAsync(async (req, res, next) => {
-  // 1) Create error if user POSTs password data
-  if (req.body.password || req.body.passwordConfirm) {
-    return next(new AppError('Please use Password Update page / Forgot Password to update your password.', 400));
+exports.createPassword = catchAsync(async (req, res, next) => {
+  if (req.body.password || req.body.confirmPassword) {
+    if (!req.body.password || !req.body.confirmPassword) {
+      return next(new AppError('Please provide both password and confirmPassword.', 400));
+    }
+
+    if (req.body.password !== req.body.confirmPassword) {
+      return next(new AppError('Passwords do not match.', 400));
+    }
+    console.log("User for password update:", req.user.id);
+
+    const user = await User.findById(req.user.id).select('+password');
+    if (!user) {
+      return next(new AppError('User not found.', 404));
+    }
+
+    user.password = req.body.password; // Will be hashed by pre-save middleware
+    await user.save(); // Not findByIdAndUpdate → so that pre-save middleware works
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Password updated successfully!',
+    });
   }
 
-  // 2) Filtered out unwanted fields names that are not allowed to be updated
-  const filteredBody = filterObj(req.body, 'id', 'email', 'role');
+  // 3) Otherwise update non-password fields
+  const filteredBody = filterObj(req.body, 'name', 'phone'); // allow only safe fields
   if (req.file) filteredBody.photo = req.file.filename;
-  // console.log('==filteredBody===', filteredBody)
-  // 3) Update user document
+
   const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
     new: true,
     runValidators: true,
@@ -108,6 +126,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     },
   });
 });
+
 
 exports.deleteMe = catchAsync(async (req, res, next) => {
   await User.findByIdAndUpdate(req.user.id, { deleted: true });
