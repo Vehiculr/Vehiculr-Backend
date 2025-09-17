@@ -1,9 +1,14 @@
 const express = require('express');
-const router = express.Router({ mergeParams: true }); 
+const router = express.Router({ mergeParams: true });
 const partnerController = require('../controllers/partnerController');
 const authController = require('../controllers/authController');
 const { validateKYC, validateBrands, validateServices, validateOTPRequest, validateOTPVerification } = require('../valiations/partnerValidation');
 const { otpLimiter, apiLimiter } = require('../middleware/security');
+const validation = require('../valiations/qrValidation');
+const rateLimit = require('express-rate-limit');
+const { protect, restrictTo } = authController;
+const publicQrController = require('../controllers/publicQrController');
+
 
 
 
@@ -13,15 +18,36 @@ router.use(apiLimiter);
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
 router.get('/:id', partnerController.getPartnerById);
+router.get('/qr-code', partnerController.getQRCode);
 // New KYC verification route
 router.patch('/partnerKYC', authController.protect, partnerController.updateKYC);
+router.post('/generate-qr-code', authController.protect, partnerController.generateQRCode);
 
+
+// Public routes (no authentication required)
+router.get('/garage/:garageId', publicQrController.getGarageByPublicId);
+router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 
 // ==================== PARTNER ONBOARDING ROUTES ====================
 
 // ✅ Partner-specific auth
-router.post('/partner/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
-router.post('/partner/verify-otp', otpLimiter, validateOTPVerification, authController.verifyOTP);
+router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
+router.post('/verify-otp', otpLimiter, validateOTPVerification, authController.verifyOTP);
+
+// QR Code generation route
+// router.get('/qr-code',
+//     authController.protect,
+//     restrictTo('partner'),
+//     validation.validateQRCodeRequest,
+//     partnerController.getQRCode
+// );
+
+// router.post('/generate-qr-code',
+//     authController.protect,
+//     restrictTo('partner'),
+//     validation.validateQRCodeRequest,
+//     partnerController.getQRCode
+// );
 
 // // ✅ Partner profile management
 // router.route('/partner/profile')

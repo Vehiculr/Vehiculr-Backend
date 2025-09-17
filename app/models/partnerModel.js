@@ -26,6 +26,11 @@ const kycSchema = new mongoose.Schema({
 }, { _id: false });
 
 const partnerSchema = new mongoose.Schema({
+  garageId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows null values but ensures uniqueness for non-null
+  },
   fullName: {
     type: String,
     // required: [true, 'Please tell us your name!'],
@@ -57,5 +62,13 @@ const partnerSchema = new mongoose.Schema({
   },
   kyc: kycSchema // ✅ Added KYC support
 }, { timestamps: true });
+
+// Generate garage ID before saving if not exists
+partnerSchema.pre('save', function(next) {
+  if (!this.garageId && this._id) {
+    this.garageId = `GAR${this._id.toString().slice(-5).toUpperCase()}`;
+  }
+  next();
+});
 
 module.exports = mongoose.model('Partner', partnerSchema);
