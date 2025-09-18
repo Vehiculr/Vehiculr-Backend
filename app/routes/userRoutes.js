@@ -60,6 +60,7 @@ router
   .post(userController.createUser);
 
 // ✅ Profile routes
+router.get('/getUserVehicles', authController.protect, userController.getUserVehicles);
 router.route('/:id').get(userController.getUser);
 router.get('/getMe', userController.setUserId, userController.getMe());
 router.patch('/createPassword', authController.protect, userController.createPassword);
@@ -67,7 +68,9 @@ router.patch('/updatePassword', authController.protect, authController.updatePas
 router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
 router.patch('/updateUserProfile', authController.protect, authController.updateUserProfile);
 router.delete('/deleteMe', authController.protect, userController.deleteMe);
-router.patch('/updateVehicles',authController.protect,userController.updateVehicles);
+router.patch('/updateVehicles', authController.protect, userController.updateVehicles);
+router.patch('/updateRideAndDrives', authController.protect, userController.updateRideAndDrives);
+router.delete('/clearVehicles', authController.protect, userController.clearVehicles);
 
 
 

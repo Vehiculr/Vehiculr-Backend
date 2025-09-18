@@ -644,10 +644,11 @@ exports.deleteCoverPhoto = catchAsync(async (req, res, next) => {
     });
   }
 })
+
 // PATCH controller for adding vehicles
 exports.updateVehicles = catchAsync(async (req, res, next) => {
   try {
-    const userId = req.user.id; // taken from token (protect middleware)
+    const userId = req.user.id;
     const { bikes, cars } = req.body;
 
     const user = await User.findByIdAndUpdate(
@@ -680,4 +681,88 @@ exports.updateVehicles = catchAsync(async (req, res, next) => {
       error: err.message,
     });
   }
+});
+
+
+// Update user vehicles (rides and drives)
+exports.updateRideAndDrives = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+  const { rides, drives } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  // Initialize vehicles object if it doesn't exist
+  if (!user.vehicles) {
+    user.vehicles = {
+      rides: [],
+      drives: []
+    };
+  }
+
+  // Update rides if provided (remove duplicates)
+  if (rides !== undefined) {
+    const uniqueRides = [...new Set(rides.map(ride => ride.trim()))].filter(ride => ride);
+    user.vehicles.rides = uniqueRides;
+  }
+
+  // Update drives if provided (remove duplicates)
+  if (drives !== undefined) {
+    const uniqueDrives = [...new Set(drives.map(drive => drive.trim()))].filter(drive => drive);
+    user.vehicles.drives = uniqueDrives;
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Vehicles updated successfully',
+    data: {
+      vehicles: user.vehicles
+    }
+  });
+});
+
+// Get user vehicles
+exports.getUserVehicles = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+console.log('getUserVehicles==>', userId)
+  const user = await User.findById(userId).select('vehicles');
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      vehicles: user.vehicles || { rides: [], drives: [] }
+    }
+  });
+});
+
+// Clear all vehicles
+exports.clearVehicles = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  user.vehicles = {
+    rides: [],
+    drives: []
+  };
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Vehicles cleared successfully',
+    data: {
+      vehicles: user.vehicles
+    }
+  });
 });
