@@ -194,6 +194,18 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Topic'
   }],
+   vehicles: {
+    rides: [{
+      type: String, 
+      trim: true,
+      maxlength: 50
+    }],
+    drives: [{
+      type: String, 
+      trim: true,
+      maxlength: 50
+    }]
+  },
   bikes: {
     type: [String],
     default: []

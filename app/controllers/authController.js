@@ -610,10 +610,6 @@ exports.updateUsername = catchAsync(async (req, res, next) => {
   });
 });
 
-
-
-
-
 // msg91 integration
 const msg91 = require('../services/msg91Service');
 
