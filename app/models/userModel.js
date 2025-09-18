@@ -166,6 +166,12 @@ const userSchema = new mongoose.Schema({
       select: false,
     },
   ],
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
   phone: String,
   address: {
     street: String,
@@ -189,13 +195,13 @@ const userSchema = new mongoose.Schema({
     ref: 'Topic'
   }],
   bikes: {
-  type: [String],
-  default: []
-},
-cars: {
-  type: [String],
-  default: []
-},
+    type: [String],
+    default: []
+  },
+  cars: {
+    type: [String],
+    default: []
+  },
 }, {
   timestamps: true
 });

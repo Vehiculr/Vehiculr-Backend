@@ -9,8 +9,10 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const sendEmail = require('../utils/email');
 const { sendOTP } = require('../services/twilioClient');
-const generateOTP = require('../utils/generateOTP');
+const { generateOTP } = require('../utils/generateOTP');
 const { sendWhatsAppMessage } = require('../services/twilioClient');
+
+const isProduction = () => process.env.NODE_ENV === 'production';
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -408,19 +410,30 @@ exports.requestOTP = async (req, res) => {
     }
 
     const otp = generateOTP();
-    console.log(`Generated OTP for ${phone}: ${otp}`);
-    const otpExpires = new Date(Date.now() + process.env.OTP_EXPIRY * 60000); // OTP expires in X minutes
+    const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000); // Default 10 minutes
 
     user.otp = otp;
     user.otpExpires = otpExpires;
     await user.save();
-    const twilioResponse = await sendOTP(phone, otp);
-    if (!twilioResponse.success) {
-      return res.status(500).json({ message: "OTP sending failed", error: twilioResponse.error });
+
+    // Send OTP based on environment
+    const otpResponse = await sendOTP(phone, otp);
+
+    if (!otpResponse.success) {
+      return res.status(500).json({
+        message: "OTP sending failed",
+        error: otpResponse.error
+      });
     }
 
-    res.status(200).json({ message: "OTP sent successfully" });
+    res.status(200).json({
+      message: "OTP sent successfully",
+      mode: isProduction() ? 'production' : 'development',
+      // Include OTP in development for testing
+      ...(!isProduction() && { otp: otp, expiresIn: `${process.env.OTP_EXPIRY || 10} minutes` })
+    });
   } catch (error) {
+    console.error("OTP request error:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
@@ -434,17 +447,32 @@ exports.verifyOTP = async (req, res) => {
     }
 
     const user = await User.findOne({ phone });
-    console.log("User found for OTP verification:", user);  
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ✅ Proper OTP validation
-    console.log("Verifying user.otpExpires, Date.now()", user.otpExpires, Date.now());
-    if (user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
+    // In development, allow using the default test OTP regardless of what's stored
+    let isValidOTP = false;
+
+    if (isProduction()) {
+      // Production: Strict OTP validation
+      isValidOTP = user.otp === otp && user.otpExpires > Date.now();
+    } else {
+      // Development: Allow test OTP or actual stored OTP
+      const testOTP = process.env.DEFAULT_OTP || '12345';
+      isValidOTP = (user.otp === otp && user.otpExpires > Date.now()) || otp === testOTP;
+
+      if (otp === testOTP) {
+        console.log('✅ Development mode: Using test OTP');
+      }
     }
-    
+
+    if (!isValidOTP) {
+      return res.status(400).json({
+        message: "Invalid or expired OTP",
+        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '12345'}`
+      });
+    }
 
     // ✅ OTP is valid → mark user as verified
     user.isVerified = true;
@@ -459,7 +487,11 @@ exports.verifyOTP = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.status(200).json({ message: "OTP verified successfully", token });
+    res.status(200).json({
+      message: "OTP verified successfully",
+      token,
+      mode: isProduction() ? 'production' : 'development'
+    });
   } catch (error) {
     console.error("OTP verification error:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
