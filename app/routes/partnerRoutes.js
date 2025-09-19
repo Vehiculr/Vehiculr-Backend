@@ -67,6 +67,10 @@ router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
 router.post('/verify-otp', otpLimiter, validateOTPVerification, authController.verifyOTP);
 
+// // ✅ Partner profile management
+router.route('/updatePartnerProfile')
+  .patch(authController.protect, partnerController.updatePartnerProfile);
+
 // Brands and Services routes
 router.get('/my-brands',
   protect,
