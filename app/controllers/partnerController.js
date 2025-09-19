@@ -122,9 +122,8 @@ exports.getPartnerProfile = catchAsync(async (req, res, next) => {
 
 // Update partner profile
 exports.updatePartnerProfile = catchAsync(async (req, res, next) => {
-  const allowedFields = ['businessName', 'shopLocation', 'businessDomain', 'description'];
+  const allowedFields = ['fullName', 'businessName', 'shopLocation', 'expertise', 'description'];
   const filteredBody = {};
-
   Object.keys(req.body).forEach(key => {
     if (allowedFields.includes(key)) {
       filteredBody[key] = req.body[key];
@@ -136,7 +135,6 @@ exports.updatePartnerProfile = catchAsync(async (req, res, next) => {
     filteredBody,
     { new: true, runValidators: true }
   );
-
   res.status(200).json({
     success: true,
     message: 'Profile updated successfully',
@@ -271,27 +269,27 @@ exports.getAvailableBrands = catchAsync(async (req, res, next) => {
 // Update partner brands
 exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
-  console.log('Request body:', partner); 
-  
+  console.log('Request body:', partner);
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
 
   const { carBrands: newCarBrands, bikeBrands: newBikeBrands } = req.body;
-  
 
-   // Initialize brands object if it doesn't exist
+
+  // Initialize brands object if it doesn't exist
   if (!partner.brands) {
     partner.brands = {
       carBrands: [],
       bikeBrands: []
     };
   }
-  
-   // Calculate total selected brands
+
+  // Calculate total selected brands
   const currentCarBrands = newCarBrands !== undefined ? newCarBrands : (partner.brands.carBrands || []);
   const currentBikeBrands = newBikeBrands !== undefined ? newBikeBrands : (partner.brands.bikeBrands || []);
-  
+
   const totalSelectedBrands = currentCarBrands.length + currentBikeBrands.length;
 
   // Check if partner exceeds free tier limit
@@ -306,7 +304,7 @@ exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   if (newCarBrands !== undefined) {
     partner.brands.carBrands = newCarBrands;
   }
-  
+
   if (newBikeBrands !== undefined) {
     partner.brands.bikeBrands = newBikeBrands;
   }
@@ -329,7 +327,7 @@ exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
 // Get partner's current brand selection
 exports.getPartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id).select('brands isPremium maxFreeBrands');
-  
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -352,7 +350,7 @@ exports.getPartnerBrands = catchAsync(async (req, res, next) => {
 // Check if partner can select more brands
 exports.checkBrandLimit = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id).select('brands isPremium maxFreeBrands');
-  
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -374,10 +372,10 @@ exports.checkBrandLimit = catchAsync(async (req, res, next) => {
 
 const uploadMultipleToCloudinary = async (files, options = {}) => {
   try {
-    const uploadPromises = files.map(file => 
+    const uploadPromises = files.map(file =>
       uploadToCloudinary(file, options)
     );
-    
+
     return await Promise.all(uploadPromises);
   } catch (error) {
     throw new Error('Batch Cloudinary upload failed: ' + error.message);
@@ -385,7 +383,7 @@ const uploadMultipleToCloudinary = async (files, options = {}) => {
 };
 
 exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
- try {
+  try {
     const partnerId = req.user.id;
 
     if (!req.files || req.files.length === 0) {
@@ -406,7 +404,7 @@ exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
     // Check current photo count
     const currentPhotoCount = partner.shopPhotos ? partner.shopPhotos.length : 0;
     const newPhotoCount = req.files.length;
-    
+
     if (currentPhotoCount + newPhotoCount > 4) {
       return res.status(400).json({
         success: false,
@@ -440,7 +438,7 @@ exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
 
     // Add new photos to existing ones
     partner.shopPhotos = [...partner.shopPhotos, ...cloudinaryDataArray];
-    
+
     // Ensure we don't exceed 4 photos (safety check)
     if (partner.shopPhotos.length > 4) {
       // Delete the excess photos from Cloudinary
@@ -669,8 +667,8 @@ exports.getPartnerFeed = catchAsync(async (req, res, next) => {
 
 // Generate QR code for partner
 exports.generateQRCode = catchAsync(async (req, res, next) => {
-   const partner = await Partner.findById(req.user.id);
-  
+  const partner = await Partner.findById(req.user.id);
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -706,20 +704,20 @@ exports.generateQRCode = catchAsync(async (req, res, next) => {
     data: {
       // QR code image (base64)
       qrImageDataUrl: qrImageDataUrl,
-      
+
       // Public URL that anyone can scan
       publicUrl: publicUrl,
-      
+
       // Nice display URL to show users
       displayUrl: displayUrl,
-      
+
       // Partner information
       partner: {
         garageId: partner.garageId,
         businessName: partner.businessName,
         phoneNumber: partner.phoneNumber
       },
-      
+
       // Instructions for use
       scanInstructions: {
         message: "This QR code can be scanned by ANY QR scanner app",
