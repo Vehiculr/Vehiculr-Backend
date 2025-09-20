@@ -283,7 +283,7 @@ exports.updatePassword = async (req, res, next) => {
 // PATCH API to update username or create new user
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
   try {
-    const { userName, password, firstName, lastName, phone } = req.body;
+    const { username, password, firstName, lastName, phone } = req.body;
     const userId = req.user.id;
 
     const user = await User.findById(userId);
@@ -295,9 +295,9 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
     }
 
     // Check username uniqueness ONLY if username is being updated
-    if (userName && userName !== user.userName) {
+    if (username && username !== user.username) {
       const usernameExists = await User.findOne({
-        userName,
+        username,
         _id: { $ne: user._id } // Exclude current user
       });
 console.log('usernameExists', usernameExists);  
@@ -305,10 +305,10 @@ console.log('usernameExists', usernameExists);
       if (usernameExists) {
         return res.status(409).json({
           success: false,
-          message: 'userName already taken by another user'
+          message: 'username already taken by another user'
         });
       }
-      user.userName = userName;
+      user.username = username;
     }
 
     // Update other fields if provided
@@ -607,14 +607,14 @@ exports.storeUserPassword = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.checkUsernameExists = catchAsync(async (req, res, next) => {
-  const { userName } = req.query;
+exports.checkusernameExists = catchAsync(async (req, res, next) => {
+  const { username } = req.query;
 
-  if (!userName) {
-    return next(new AppError('Username is required', 400));
+  if (!username) {
+    return next(new AppError('username is required', 400));
   }
 
-  const user = await User.findOne({ userName: username });
+  const user = await User.findOne({ username: username });
 
   res.status(200).json({
     status: 'success',
@@ -626,30 +626,30 @@ exports.checkUsernameExists = catchAsync(async (req, res, next) => {
 
 
 
-exports.updateUsername = catchAsync(async (req, res, next) => {
-  const { newUsername } = req.body;
+exports.updateusername = catchAsync(async (req, res, next) => {
+  const { newusername } = req.body;
 
-  if (!newUsername) {
+  if (!newusername) {
     return next(new AppError('New username is required', 400));
   }
 
-  const existingUser = await User.findOne({ userName: newUsername });
+  const existingUser = await User.findOne({ username: newusername });
 
   if (existingUser) {
-    return next(new AppError('Username already taken. Please choose another.', 409));
+    return next(new AppError('username already taken. Please choose another.', 409));
   }
 
   const updatedUser = await User.findByIdAndUpdate(
     req.user.id,
-    { userName: newUsername },
+    { username: newusername },
     { new: true, runValidators: true }
   );
 
   res.status(200).json({
     status: 'success',
-    message: 'Username updated successfully',
+    message: 'username updated successfully',
     data: {
-      userName: updatedUser.userName,
+      username: updatedUser.username,
     },
   });
 });
