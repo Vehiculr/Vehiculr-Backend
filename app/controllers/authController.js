@@ -11,6 +11,7 @@ const sendEmail = require('../utils/email');
 const { sendOTP } = require('../services/twilioClient');
 const { generateOTP } = require('../utils/generateOTP');
 const { sendWhatsAppMessage } = require('../services/twilioClient');
+require("dotenv").config();
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
@@ -505,7 +506,7 @@ exports.verifyOTP = async (req, res) => {
       isValidOTP = account.otp === otp && account.otpExpires > Date.now();
     } else {
       // Development: Allow test OTP or actual stored OTP
-      const testOTP = process.env.DEFAULT_OTP || '123456';
+      const testOTP = process.env.DEFAULT_OTP || '12345';
       isValidOTP = (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
 
       if (otp === testOTP) {
@@ -516,7 +517,7 @@ exports.verifyOTP = async (req, res) => {
     if (!isValidOTP) {
       return res.status(400).json({
         message: "Invalid or expired OTP",
-        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '123456'}`,
+        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '12345'}`,
         accountType: accountType
       });
     }
