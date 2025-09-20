@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     trim: true
   },
-  userName: {
+  username: {
     type: String,
     unique: true,
     trim: true,
@@ -236,8 +236,8 @@ const otpSchema = new mongoose.Schema({
 });
 
 
-// Index for userName and email
-userSchema.index({ userName: 1 }, { unique: true });
+// Index for username and email
+userSchema.index({ username: 1 }, { unique: true });
 userSchema.index({ email: 1 }, { unique: true });
 
 // Method to update login info
