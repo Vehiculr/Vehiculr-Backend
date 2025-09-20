@@ -124,9 +124,6 @@ exports.login = catchAsync(async (req, res, next) => {
   ]);
 
   const account = foundUser || foundPartner;
-
-  console.log('account:', account);
-
   if (!account) {
     return res.status(404).json({
       success: false,
@@ -297,86 +294,67 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
       });
     }
 
-    if (user) {
-      // User exists, check if the requested username is available
-      const usernameExists = await User.findOne({ username });
-      if (usernameExists && usernameExists._id.toString() !== user._id.toString()) {
+    // Check username uniqueness ONLY if username is being updated
+    if (username && username !== user.username) {
+      const usernameExists = await User.findOne({
+        username,
+        _id: { $ne: user._id } // Exclude current user
+      });
+
+      if (usernameExists) {
         return res.status(409).json({
+          success: false,
           message: 'Username already taken by another user'
         });
       }
+      user.username = username;
+    }
 
-      // Update the username
-      if (username) user.username = username;
-      // Optionally update other fields if provided
-      if (password) {
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-      }
-      if (firstName) user.firstName = firstName;
-      if (lastName) user.lastName = lastName;
-      if (phone) user.phone = phone;
+    // Update other fields if provided
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
 
-      await user.save();
-
-      return res.status(200).json({
-        message: 'Username updated successfully',
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          phone: user.phone,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          isActive: user.isActive
-        }
+    // Check phone uniqueness ONLY if phone is being updated
+    if (phone && phone !== user.phone) {
+      const phoneExists = await User.findOne({
+        phone,
+        _id: { $ne: user._id } // Exclude current user
       });
-    } else {
-      // User doesn't exist, check if we have enough info to create a new user
-      if (!password || !firstName || !lastName) {
-        return res.status(400).json({
-          message: 'User not found. To create a new user, please provide password, firstName, and lastName'
+
+      if (phoneExists) {
+        return res.status(409).json({
+          success: false,
+          message: 'Phone number already registered with another account'
         });
       }
-
-      // Check if email is valid if identifier is an email
-      const isEmail = /^\S+@\S+\.\S+$/.test(identifier);
-
-      // Create new user
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      const newUser = new User({
-        username,
-        email: isEmail ? identifier : undefined,
-        phone: !isEmail ? identifier : phone,
-        password: hashedPassword,
-        firstName,
-        lastName
-      });
-
-      await newUser.save();
-
-      return res.status(201).json({
-        message: 'User created successfully',
-        user: {
-          id: newUser._id,
-          username: newUser.username,
-          email: newUser.email,
-          phone: newUser.phone,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          isActive: newUser.isActive
-        }
-      });
+      user.phone = phone;
     }
+
+    await user.save();
+
+    // Return updated user data (excluding sensitive information)
+    const updatedUser = await User.findById(userId).select('-password -otp -otpExpires');
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        user: updatedUser
+      }
+    });
+
   } catch (error) {
-    console.error('Error in PATCH /users/username:', error);
+    console.error('Error updating user profile:', error);
 
     // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyValue)[0];
       return res.status(409).json({
+        success: false,
         message: `${field} already exists`,
         field: field
       });
@@ -386,13 +364,15 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
+        success: false,
         message: 'Validation failed',
         errors: errors
       });
     }
 
     res.status(500).json({
-      message: 'Server error while processing user',
+      success: false,
+      message: 'Server error while updating profile',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
@@ -465,10 +445,10 @@ exports.requestOTP = async (req, res) => {
       mode: isProduction() ? 'production' : 'development',
       accountType: detectedAccountType,
       // Include OTP in development for testing
-      ...(!isProduction() && { 
-        otp: otp, 
+      ...(!isProduction() && {
+        otp: otp,
         expiresIn: `${process.env.OTP_EXPIRY || 10} minutes`,
-        accountId: account._id 
+        accountId: account._id
       })
     });
   } catch (error) {
@@ -554,9 +534,9 @@ exports.verifyOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("OTP verification error:", error);
-    res.status(500).json({ 
-      message: "Server Error", 
-      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error" 
+    res.status(500).json({
+      message: "Server Error",
+      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error"
     });
   }
 };
