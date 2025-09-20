@@ -283,7 +283,7 @@ exports.updatePassword = async (req, res, next) => {
 // PATCH API to update username or create new user
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
   try {
-    const { username, password, firstName, lastName, phone } = req.body;
+    const { userName, password, firstName, lastName, phone } = req.body;
     const userId = req.user.id;
 
     const user = await User.findById(userId);
@@ -295,19 +295,20 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
     }
 
     // Check username uniqueness ONLY if username is being updated
-    if (username && username !== user.username) {
+    if (userName && userName !== user.userName) {
       const usernameExists = await User.findOne({
-        username,
+        userName,
         _id: { $ne: user._id } // Exclude current user
       });
+console.log('usernameExists', usernameExists);  
 
       if (usernameExists) {
         return res.status(409).json({
           success: false,
-          message: 'Username already taken by another user'
+          message: 'userName already taken by another user'
         });
       }
-      user.username = username;
+      user.userName = userName;
     }
 
     // Update other fields if provided
@@ -607,9 +608,9 @@ exports.storeUserPassword = catchAsync(async (req, res, next) => {
 });
 
 exports.checkUsernameExists = catchAsync(async (req, res, next) => {
-  const { username } = req.query;
+  const { userName } = req.query;
 
-  if (!username) {
+  if (!userName) {
     return next(new AppError('Username is required', 400));
   }
 
