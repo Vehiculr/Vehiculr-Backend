@@ -90,6 +90,15 @@ const partnerSchema = new mongoose.Schema({
     unique: true,
     match: [/^\+91[0-9]{10}$/, 'Please enter a valid Indian phone number with +91']
   },
+  email: {
+    type: String
+  },
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
   expertise: {
     type: [String],
     enum: ['Off-Roads', 'Vintages', 'Luxury Automobile'],

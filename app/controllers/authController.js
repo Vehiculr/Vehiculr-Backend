@@ -542,6 +542,207 @@ exports.verifyOTP = async (req, res) => {
   }
 };
 
+exports.requestEmailOTP = async (req, res) => {
+  try {
+    const { email, accountType = 'user' } = req.body;
+    console.log('requestEmailOTP called with:', req.body);  
+    
+    if (!email) {
+      return res.status(400).json({ 
+        message: "Email address is required" 
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        message: "Invalid email format" 
+      });
+    }
+
+    let account;
+    let detectedAccountType;
+
+    // Check both collections concurrently
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ email: email.toLowerCase() }),
+      Partner.findOne({ email: email.toLowerCase() })
+    ]);
+    console.log('requestEmailOTP called with:', foundUser, foundPartner);  
+    
+    // If requesting partner and partner exists, use partner
+    if (accountType === 'partner' && foundPartner) {
+      account = foundPartner;
+      detectedAccountType = 'partner';
+    }
+    // If requesting user and user exists, use user
+    else if (accountType === 'user' && foundUser) {
+      account = foundUser;
+      detectedAccountType = 'user';
+    }
+    // If account exists but not the requested type, return error
+    else if ((accountType === 'partner' && foundUser) || 
+             (accountType === 'user' && foundPartner)) {
+      return res.status(400).json({
+        message: `Email already registered as ${foundUser ? 'user' : 'partner'}`,
+        existingAccountType: foundUser ? 'user' : 'partner',
+        suggestion: 'Use a different email address or contact support'
+      });
+    }
+    // No account exists, create new based on requested type
+    else {
+      if (accountType === 'partner') {
+        account = await Partner.create({ 
+          email: email.toLowerCase(),
+          emailVerified: false
+        });
+        detectedAccountType = 'partner';
+      } else {
+        account = await User.create({ 
+          email: email.toLowerCase(),
+          emailVerified: false
+        });
+        detectedAccountType = 'user';
+      }
+    }
+
+    // Generate OTP and set expiration
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
+
+    // Update OTP details
+    account.otp = otp;
+    account.otpExpires = otpExpires;
+    await account.save();
+
+    // Send OTP via email
+    const otpResponse = await sendOTP(email, otp);
+
+    if (!otpResponse.success) {
+      return res.status(500).json({
+        message: "Failed to send OTP email",
+        error: otpResponse.error
+      });
+    }
+
+    res.status(200).json({
+      message: "OTP sent successfully to your email",
+      mode: isProduction() ? 'production' : 'development',
+      accountType: detectedAccountType,
+      // Include OTP in development for testing
+      ...(!isProduction() && {
+        otp: otp,
+        expiresIn: `${process.env.OTP_EXPIRY || 10} minutes`,
+        accountId: account._id
+      })
+    });
+  } catch (error) {
+    console.error("Email OTP request error:", error);
+    
+    // Handle duplicate key errors (if email is unique in both collections)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Email already exists in the system",
+        error: "Duplicate email"
+      });
+    }
+    
+    res.status(500).json({ 
+      message: "Server Error", 
+      error: error.message 
+    });
+  }
+};
+
+
+exports.verifyEmailOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({ 
+        message: "Email and OTP are required" 
+      });
+    }
+
+  // Check both User and Partner collections
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ email }),
+      Partner.findOne({ email })
+    ]);
+
+    const account = foundUser || foundPartner;
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const accountType = foundUser ? 'user' : 'partner';
+
+    // In development, allow using the default test OTP regardless of what's stored
+    let isValidOTP = false;
+
+    if (isProduction()) {
+      // Production: Strict OTP validation
+      isValidOTP = account.otp === otp && account.otpExpires > Date.now();
+    } else {
+      // Development: Allow test OTP or actual stored OTP
+      const testOTP = process.env.DEFAULT_OTP || '12345';
+      isValidOTP = (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
+
+      if (otp === testOTP) {
+        console.log('✅ Development mode: Using test OTP');
+      }
+    }
+
+    if (!isValidOTP) {
+      return res.status(400).json({
+        message: "Invalid or expired OTP",
+        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '12345'}`,
+        accountType: accountType
+      });
+    }
+
+    // Clear OTP and mark email as verified
+    account.otp = undefined;
+    account.otpExpires = undefined;
+    account.emailVerified = true;
+    await account.save();
+
+    // Generate authentication token (if needed)
+ // ✅ Generate JWT token with account type in payload
+    const tokenPayload = {
+      id: account._id,
+      phone: account.phone,
+      accountType: accountType,
+      isVerified: true
+    };
+
+    const token = jwt.sign(
+      tokenPayload,
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.status(200).json({
+      message: "Email verified successfully",
+      emailVerified: true,
+      token: token,
+      accountType: accountType,
+      accountId: account._id,
+      mode: isProduction() ? 'production' : 'development',
+      // Include user/partner specific data if needed
+      ...(accountType === 'partner' && { businessName: account.businessName }),
+      ...(accountType === 'user' && { fullName: account.fullName })
+    });
+  } catch (error) {
+    console.error("Email OTP verification error:", error);
+    res.status(500).json({ 
+      message: "Server Error", 
+      error: error.message 
+    });
+  }
+};
+
 
 exports.sendWhatsAppPromotionMessage = async (req, res) => {
   try {

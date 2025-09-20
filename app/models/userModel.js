@@ -12,9 +12,6 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     unique: true,
-    sparse: true,
-    lowercase: true,
-    trim: true,
     validate: {
       validator: function (v) {
         return !v || /\S+@\S+\.\S+/.test(v);
