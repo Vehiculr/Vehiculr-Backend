@@ -51,6 +51,8 @@ router.post('/logout', authController.logout);
 router.post('/forgotPassword', authController.forgotPassword);
 router.post('/request-otp', authController.requestOTP);
 router.post('/verify-otp', authController.verifyOTP);
+router.post('/request-email-otp', authController.requestEmailOTP);
+router.post('/verify-email-otp', authController.verifyEmailOTP);
 router.post('/store-password', authController.storeUserPassword);
 
 // ✅ User routes
