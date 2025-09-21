@@ -9,6 +9,6 @@ const citySchema = new mongoose.Schema({
     }
 });
 
-// citySchema.index({ location: '2dsphere' });
+citySchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('City', citySchema);
