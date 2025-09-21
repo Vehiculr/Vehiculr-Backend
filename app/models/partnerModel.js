@@ -117,7 +117,31 @@ const partnerSchema = new mongoose.Schema({
   maxFreeBrands: {
     type: Number,
     default: 50   // brand limit befeoreIncreased limit for free accounts
-  }
+  },
+
+  // QR Code data
+  qrCode: {
+    publicUrl: {
+      type: String,
+      required: false
+    },
+    displayUrl: {
+      type: String,
+      required: false
+    },
+    qrImageData: {
+      type: String, // This will store the Data URL of the QR code image
+      required: false
+    },
+    generatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
 
 }, { timestamps: true });
 
@@ -127,7 +151,9 @@ partnerSchema.pre('save', function (next) {
   if (!this.garageId && this._id) {
     this.garageId = `GAR${this._id.toString().slice(-5).toUpperCase()}`;
   }
-
+ if (this.isModified('qrCode')) {
+    this.qrCode.lastUpdated = new Date();
+ }
   // Initialize brands object if not exists
   if (!this.brands) {
     this.brands = {
@@ -135,6 +161,7 @@ partnerSchema.pre('save', function (next) {
       bikeBrands: []
     };
   }
+  
 
   next();
 });

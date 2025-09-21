@@ -594,13 +594,13 @@ exports.subscribeToPremium = catchAsync(async (req, res, next) => {
 // Get QR code
 exports.getQRCode = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
-  const qrCodeData = await generateQRCode(partner._id);
+  // const qrCodeData = await generateQRCode(partner._id);
 
   res.status(200).json({
     success: true,
     data: {
-      qrCodeImageUrl: qrCodeData.imageUrl,
-      profileDeepLink: qrCodeData.deepLink
+      qrCodeImageUrl: partner.qrCode.qrImageData,
+      profileDeepLink: partner.qrCode.publicUrl
     }
   });
 });

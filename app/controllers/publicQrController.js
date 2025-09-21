@@ -28,7 +28,7 @@ exports.getGarageByPublicId = catchAsync(async (req, res, next) => {
       garage: {
         id: partner.garageId,
         name: partner.businessName,
-        phone: partner.phoneNumber,
+        phone: partner.phone,
         address: partner.address,
         services: partner.services,
         brands: partner.brands,
@@ -50,7 +50,7 @@ exports.getGaragePublicProfile = catchAsync(async (req, res, next) => {
     $or: [
       { garageId: garageId }
     ]
-  }).select('businessName phoneNumber address services brands shopLocation shopPhotos isPremium garageId');
+  }).select('businessName phone address services brands shopLocation shopPhotos.url isPremium garageId');
 
   console.log("Found partner:", partner);   
   if (!partner) {
@@ -81,8 +81,8 @@ exports.getGaragePublicProfile = catchAsync(async (req, res, next) => {
       
       <div class="contact-info">
         <h2>Contact Information</h2>
-        <p><strong>Phone:</strong> <a href="tel:${partner.phoneNumber}">${partner.phoneNumber}</a></p>
-        <p><strong>Address:</strong> ${partner.address || 'Not specified'}</p>
+        <p><strong>Phone:</strong> <a href="tel:${partner.phone}">${partner.phone}</a></p>
+        <p><strong>Address:</strong> ${partner.shopLocation || 'Not specified'}</p>
       </div>
 
       ${partner.services && partner.services.length > 0 ? `
@@ -102,7 +102,13 @@ exports.getGaragePublicProfile = catchAsync(async (req, res, next) => {
       ${partner.shopPhotos && partner.shopPhotos.length > 0 ? `
       <div class="photo-gallery">
         <h2>Shop Photos</h2>
-        ${partner.shopPhotos.map(photo => `<img src="${photo}" alt="Shop Photo">`).join('')}
+        ${partner.shopPhotos.map((photo, index) => `
+          <img 
+            src="${photo.url}" 
+            alt="Shop Photo ${index + 1}" 
+            class="shop-photo"
+          />
+        `).join('')}
       </div>
       ` : ''}
 
