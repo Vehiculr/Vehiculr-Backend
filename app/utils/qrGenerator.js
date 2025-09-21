@@ -4,7 +4,7 @@ const path = require('path');
 const jwt = require('jwt-simple');
 const Partner = require('../models/partnerModel');
 const QR_JWT_SECRET = process.env.QR_JWT_SECRET;
-const BASE_URL = process.env.BASE_URL || 'https://yourdomain.com';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:9002';
 
 // Secret key for JWT encoding
 
