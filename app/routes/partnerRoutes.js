@@ -47,11 +47,11 @@ router.use(apiLimiter);
 
 
 // Routes
+router.get('/qr-code', authController.protect, partnerController.getQRCode);
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
 router.get('/:id', partnerController.getPartnerById);
-router.get('/qr-code', partnerController.getQRCode);
 // New KYC verification route
 router.patch('/partnerKYC', authController.protect, partnerController.updateKYC);
 router.post('/generate-qr-code', authController.protect, partnerController.generateQRCode);
