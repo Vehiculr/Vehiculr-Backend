@@ -165,5 +165,6 @@ partnerSchema.pre('save', function (next) {
 
   next();
 });
+partnerSchema.index({ shopLocation: '2dsphere' });
 
 module.exports = mongoose.model('Partner', partnerSchema);
