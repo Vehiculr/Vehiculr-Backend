@@ -2,10 +2,10 @@ const { body } = require('express-validator');
 
 const carBrands = ['Audi', 'BMW', 'Chevrolet', 'Ford', 'Hyundai', 'Honda', 'Jeep', 'Kia', 
                   'Mahindra', 'Morris Garages', 'Nissan', 'Renault', 'Skoda', 'Suzuki', 
-                  'Tata Motors', 'Toyota'];
+                  'Tata Motors', 'Toyota','Rolls Royce'];
 
-const bikeBrands = ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS', 'Honda', 'Yamaha', 
-                   'Kawasaki', 'Ducati', 'Benelli', 'BMW'];
+const bikeBrands = ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS','KTM','Honda', 'Yamaha', 
+                   'Kawasaki', 'Ducati', 'Benelli', 'BMW','HarleyDavidson','BMW Motorrad','Royal Enfield'];
 
 const validateBrandSelection = [
   body('carBrands')
