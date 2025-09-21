@@ -32,7 +32,7 @@ const brandsSchema = new mongoose.Schema({
   bikeBrands: [{
     type: String,
     enum: ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS', 'Honda', 'Yamaha',
-      'Kawasaki', 'Ducati', 'Benelli', 'BMW']
+      'Kawasaki', 'Ducati', 'Benelli', 'BMW','Royal Enfield','HarleyDavidson','BMW Motorrad']
   }]
 }, { _id: false });
 

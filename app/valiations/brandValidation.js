@@ -5,7 +5,7 @@ const carBrands = ['Audi', 'BMW', 'Chevrolet', 'Ford', 'Hyundai', 'Honda', 'Jeep
                   'Tata Motors', 'Toyota','Rolls Royce'];
 
 const bikeBrands = ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS','KTM','Honda', 'Yamaha', 
-                   'Kawasaki', 'Ducati', 'Benelli', 'BMW','HarleyDavidson','BMW Motorrad','Royal Enfield'];
+                   'Kawasaki', 'Ducati', 'Benelli', 'BMW','Royal Enfield','HarleyDavidson','BMW Motorrad'];
 
 const validateBrandSelection = [
   body('carBrands')
