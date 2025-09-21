@@ -1,4 +1,4 @@
-const Garage = require('../models/garageModel');
+const Partner = require('../models/partnerModel');
 const factory = require('./handlerFactory');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
@@ -23,17 +23,17 @@ exports.setHouseUserIds = (req, res, next) => {
   next();
 };
 
-exports.getUserGarage = factory.getAll(Garage);
-exports.getGarage = factory.getOne(Garage);
-exports.createGarage = factory.createOne(Garage);
-exports.updateGarage = factory.updateOne(Garage);
-exports.deleteGarage = factory.deleteOne(Garage);
+exports.getUserGarage = factory.getAll(Partner);
+exports.getGarage = factory.getOne(Partner);
+exports.createGarage = factory.createOne(Partner);
+exports.updateGarage = factory.updateOne(Partner);
+exports.deleteGarage = factory.deleteOne(Partner);
 
-exports.nearByGarage = factory.findGarages(Garage);
+exports.nearByGarage = factory.findGarages(Partner);
 
 exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
   // Get garage details using factory pattern
-  const garage = await Garage.findById(req.params.id);
+  const garage = await Partner.findById(req.params.id);
   if (!garage) return next(new AppError("Garage not found", 404));
 
   // Garage owner's WhatsApp number
@@ -64,6 +64,6 @@ Let’s not keep your next customer waiting!\n
 
 
   //Add a review:
-  exports.createGarageReview = factory.addReview(Garage);
-  exports.updateGarageReview = factory.updateReview(Garage);
-  exports.deleteGarageReview = factory.deleteReview(Garage);
+  exports.createGarageReview = factory.addReview(Partner);
+  exports.updateGarageReview = factory.updateReview(Partner);
+  exports.deleteGarageReview = factory.deleteReview(Partner);
