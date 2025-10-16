@@ -58,6 +58,7 @@ router
   .route('/')
   .get(userController.getAllUsers)
   .post(userController.createUser);
+  router.get('/count', userController.getUserCount);//to get all user route
 
 // ✅ Profile routes
 router.route('/:id').get(userController.getUser);
@@ -68,6 +69,7 @@ router.patch('/updateProfilePhoto', upload.single('file'), authController.protec
 router.patch('/updateUserProfile', authController.protect, authController.updateUserProfile);
 router.delete('/deleteMe', authController.protect, userController.deleteMe);
 router.patch('/updateVehicles',authController.protect,userController.updateVehicles);
+
 
 
 
