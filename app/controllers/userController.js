@@ -681,3 +681,21 @@ exports.updateVehicles = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+// Getting the number of user present in the User Collection
+exports.getUserCount = catchAsync(async (req, res, next) => {
+  try {
+    const count = await User.countDocuments(); 
+
+    res.status(200).json({
+      status: 'success',
+      totalUsers: count,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error fetching user count',
+      error: err.message,
+    });
+  }
+});

@@ -45,8 +45,10 @@ const upload = multer({
 
 router.use(apiLimiter);
 
+router.get('/count', partnerController.getPartnerCount);
 
 // Routes
+
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
