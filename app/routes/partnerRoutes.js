@@ -94,6 +94,9 @@ router.patch('/updatePartnerBrands',
 
 router.patch('/uploadShopPhotos', upload.array('photos', 4), authController.protect, partnerController.uploadShopPhotos);
 
+router
+  .route("/:id/notify")
+  .post(authController.protect, partnerController.notifyGarageOwner); // ✅ New Route
 // QR Code generation route
 // router.get('/qr-code',
 //     authController.protect,

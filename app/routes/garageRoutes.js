@@ -30,9 +30,6 @@ router
   .put(garageController.updateGarageReview)
   .delete(garageController.deleteGarageReview)
   
-router
-  .route("/:id/notify")
-  .post(garageController.notifyGarageOwner); // ✅ New Route
 
 
 module.exports = router;
