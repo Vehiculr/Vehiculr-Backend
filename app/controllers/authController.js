@@ -34,6 +34,7 @@ const createSendToken = (account, statusCode, res) => {
   // user.password = undefined; // Remove password field from created User
   res.status(statusCode).json({
     status: 'success',
+    message: "Login successful",
     token,
     data: {
       account,
@@ -882,3 +883,110 @@ exports.verifyUserOtp = async (req, res, next) => {
     next(new AppError('OTP verification failed', 500));
   }
 };
+
+/***********************************
+ * 🔹 1️⃣ Login via Email & Password
+ ***********************************/
+exports.loginWithEmail = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password)
+    return next(new AppError("Email and password are required", 400));
+
+  // Check both User and Partner collections
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ email }).select("+password"),
+    Partner.findOne({ email }).select("+password"),
+  ]);
+
+  const account = foundUser || foundPartner;
+  if (!account) return next(new AppError("Invalid email or password", 401));
+
+  const accountType = foundUser ? "user" : "partner";
+
+  // Compare passwords
+  const isMatch = await bcrypt.compare(password, account.password);
+  if (!isMatch) return next(new AppError("Invalid email or password", 401));
+
+  createSendToken(account, 200, res);
+});
+
+/***********************************
+ * 🔹 2️⃣ Login via Phone (Request OTP)
+ ***********************************/
+exports.loginRequestOTP = catchAsync(async (req, res, next) => {
+  const { phone } = req.body;
+
+  if (!phone) return next(new AppError("Phone number is required", 400));
+
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ phone }),
+    Partner.findOne({ phone }),
+  ]);
+
+  const account = foundUser || foundPartner;
+  if (!account)
+    return next(new AppError("Account not found. Please register first.", 404));
+
+  const accountType = foundUser ? "user" : "partner";
+
+  const otp = generateOTP();
+  const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
+
+  account.otp = otp;
+  account.otpExpires = otpExpires;
+  await account.save();
+
+  const otpResponse = await sendOTP(phone, otp);
+  if (!otpResponse.success)
+    return next(new AppError("Failed to send OTP", 500));
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully for login",
+    mode: isProduction() ? "production" : "development",
+    accountType,
+    ...( !isProduction() && { otp, expiresIn: `${process.env.OTP_EXPIRY || 10} minutes` }),
+  });
+});
+
+/***********************************
+ * 🔹 3️⃣ Verify OTP (Complete Login)
+ ***********************************/
+exports.loginVerifyOTP = catchAsync(async (req, res, next) => {
+  const { phone, otp } = req.body;
+  if (!phone || !otp)
+    return next(new AppError("Phone and OTP are required", 400));
+
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ phone }),
+    Partner.findOne({ phone }),
+  ]);
+
+  const account = foundUser || foundPartner;
+  if (!account) return next(new AppError("Account not found", 404));
+
+  const accountType = foundUser ? "user" : "partner";
+
+  let isValidOTP = false;
+console.log('Verifying OTP for account:', accountType, account.phone);
+  if (isProduction()) {
+    isValidOTP = account.otp === otp && account.otpExpires > Date.now();
+  } else {
+    const testOTP = process.env.DEFAULT_OTP || "12345";
+    isValidOTP =
+      (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
+
+    if (otp === testOTP) console.log("✅ Development mode: Test OTP used");
+  }
+
+  if (!isValidOTP)
+    return next(new AppError("Invalid or expired OTP", 400));
+
+  // Clear OTP after successful login
+  account.otp = undefined;
+  account.otpExpires = undefined;
+  await account.save();
+
+  createSendToken(account, 200, res);
+});
