@@ -3,6 +3,7 @@ const Brand = require('../models/brandModel');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const factory = require('./handlerFactory');
 const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
 const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
@@ -25,6 +26,11 @@ const fs = require('fs');
 // const { sendWhatsAppOTP } = require('../utils/notificationService');
 // const Service = require('../models/serviceModel');
 // const PremiumPlan = require('../models/premiumPlanModel');
+
+exports.setUserId = (req, res, next) => {
+  req.params.id = req.user.id;
+  next();
+};
 
 // CREATE a new partner
 exports.createPartner = async (req, res) => {
@@ -106,6 +112,10 @@ exports.updateKYC = async (req, res) => {
   } catch (err) {
     res.status(400).json({ status: 'fail', message: err.message });
   }
+};
+
+exports.getMe = () => {
+  return factory.getOne(Partner);
 };
 
 // Get partner profile

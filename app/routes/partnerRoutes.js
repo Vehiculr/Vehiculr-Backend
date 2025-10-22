@@ -46,6 +46,7 @@ const upload = multer({
 router.use(apiLimiter);
 
 
+router.get('/getMe', authController.protect, partnerController.setUserId, partnerController.getMe());
 // Routes
 router.get('/qr-code', authController.protect, partnerController.getQRCode);
 router.post('/', partnerController.createPartner);

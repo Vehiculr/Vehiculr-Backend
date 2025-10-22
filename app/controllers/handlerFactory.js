@@ -6,8 +6,8 @@ const filterObj = require('../utils/filterObject');
 exports.getOne = (Model, popOptions) =>
   catchAsync(async (req, res, next) => {
 
-    
     let query = await Model.findOne({ _id: req.params.id, ...req.docFilter });
+  if (!query) return res.status(404).send('User not found');
     if (popOptions) query = query.populate(popOptions);
     const doc = await query;
     if (!doc) {

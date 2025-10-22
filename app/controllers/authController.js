@@ -22,7 +22,6 @@ const signToken = (id) => {
 };
 
 const createSendToken = (account, statusCode, res) => {
-  console.log('user in createSendToken:', account);
   const token = signToken(account._id);
   const cookieOptions = {
     expire: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
@@ -33,8 +32,6 @@ const createSendToken = (account, statusCode, res) => {
   res.cookie('jwt', token, cookieOptions);
 
   // user.password = undefined; // Remove password field from created User
-  console.log('token:', token);
-
   res.status(statusCode).json({
     status: 'success',
     token,

@@ -62,9 +62,9 @@ router
   .post(userController.createUser);
 
 // ✅ Profile routes
+router.get('/getMe', authController.protect, userController.setUserId, userController.getMe());
 router.get('/getUserVehicles', authController.protect, userController.getUserVehicles);
 router.route('/:id').get(userController.getUser);
-router.get('/getMe', userController.setUserId, userController.getMe());
 router.patch('/createPassword', authController.protect, userController.createPassword);
 router.patch('/updatePassword', authController.protect, authController.updatePassword);
 router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
