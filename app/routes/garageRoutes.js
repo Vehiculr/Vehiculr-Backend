@@ -15,10 +15,6 @@ router
 //   router.use(garageController.filterGarages);
 
 router
-  .route("/nearby")
-  .get(garageController.nearByGarage); // ✅ near by garages
-
-router
   .route('/:id')
   .get(garageController.getGarage)
   .patch(garageController.updateGarage)

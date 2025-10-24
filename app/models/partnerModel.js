@@ -56,7 +56,7 @@ const partnerSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: false,
+      required: false, // [longitude, latitude]
     },
   },
   shopPhotos: [{

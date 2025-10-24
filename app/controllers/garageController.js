@@ -29,8 +29,6 @@ exports.createGarage = factory.createOne(Partner);
 exports.updateGarage = factory.updateOne(Partner);
 exports.deleteGarage = factory.deleteOne(Partner);
 
-exports.nearByGarage = factory.findGarages(Partner);
-
 
   //Add a review:
   exports.createGarageReview = factory.addReview(Partner);

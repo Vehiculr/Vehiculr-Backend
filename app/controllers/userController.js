@@ -1,5 +1,6 @@
 const multer = require('multer');
 const User = require('../models/userModel');
+const Partner = require('../models/partnerModel');
 const factory = require('./handlerFactory');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
@@ -8,6 +9,7 @@ const Topic = require('../models/topicsModel');
 const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
 const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
+const { sendWhatsAppMessage } = require("../services/twilioClient"); // Import Twilio utility
 
 
 exports.setUserId = (req, res, next) => {
@@ -764,5 +766,54 @@ exports.clearVehicles = catchAsync(async (req, res, next) => {
     data: {
       vehicles: user.vehicles
     }
+  });
+});
+
+exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
+  const  partnerId  = req.params.id; 
+  const partner = await Partner.findById(partnerId);
+  if (!partner) return next(new AppError("Partner Garage not found", 404));
+  const userId = req.user.id;
+  const user = await User.findById(userId);
+  console.log('=====',user)
+  if (!user) return next(new AppError("User not found", 404));
+
+  const ownerPhone = partner.phone;
+  const userPhone = user.phone || "N/A";
+  const userName = user.name || "A customer";
+  const garageName = partner.businessName || "Your Garage";
+
+  if (!ownerPhone)
+    return next(new AppError("Garage owner has no WhatsApp number", 400));
+
+  // ===== WhatsApp Message =====
+  const enquiryMessage = 
+`🚗 *New Customer Enquiry via Vehiculrr!*\n\n
+Hello *${garageName}*, 👋\n\n
+Great news! *${userName}* has shown interest in your garage through Vehiculrr.\n\n
+📞 *Customer Contact:* ${userPhone}\n
+💬 They are looking to know more about your services.\n\n
+This enquiry was sent from your listing on *Vehiculrr*, where we connect vehicle owners with trusted garages like yours.\n\n
+👉 Please reach out to *${userName}* at the above number, or share your service details and charges directly.\n\n
+Let’s not keep your next customer waiting!\n\n
+— *Team Vehiculrr* 🚀`;
+
+  await sendWhatsAppMessage(ownerPhone, enquiryMessage);
+
+  // ===== for Notify user also =====
+  const userMessage = 
+`Hey *${userName}* 👋,\n\n
+Your enquiry for *${garageName}* has been sent successfully via Vehiculrr.\n\n
+The garage owner will reach out to you soon at *${userPhone}*.\n\n
+Thanks for using *Vehiculrr*! 🚗`;
+
+  if (userPhone && userPhone !== "N/A") {
+    // await sendWhatsAppMessage(userPhone, userMessage);
+    await sendWhatsAppMessage(ownerPhone, userMessage);   //---testing for same number
+  }
+
+  res.status(200).json({
+    status: "success",
+    message: "WhatsApp enquiry sent successfully to garage and user.",
   });
 });

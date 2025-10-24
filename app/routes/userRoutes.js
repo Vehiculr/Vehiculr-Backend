@@ -54,6 +54,7 @@ router.post('/verify-otp', authController.verifyOTP);
 router.post('/request-email-otp', authController.requestEmailOTP);
 router.post('/verify-email-otp', authController.verifyEmailOTP);
 router.post('/store-password', authController.storeUserPassword);
+router.post('/:id/notify', authController.protect, userController.notifyGarageOwner);
 
 // ✅ User routes
 router

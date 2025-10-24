@@ -133,69 +133,6 @@ exports.geocodeCity = (Model) =>
 });
 
 
-// Search nearBy garages by lat lng.
-exports.findGarages = (Model) =>
-  catchAsync(async (req, res, next) => {
-    try {
-      let { latitude, longitude } = req.query;
-
-      // Validate query parameters
-      // if (!latitude || !longitude) {
-      //   return res.status(400).json({ 
-      //     success: false, 
-      //     message: "Latitude and Longitude are required!" 
-      //   });
-      // }
-      if (!latitude || !longitude) {
-        //bangalore location as default is locaiton not provided
-        latitude = "12.9716";
-        longitude = "77.5946";
-      }
-      const lat = parseFloat(latitude);
-      const lng = parseFloat(longitude);
-      // Validate if lat/lng are valid numbers
-      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid latitude or longitude values!" 
-        });
-      }
-
-      const userLocation = {
-        type: "Point",
-        coordinates: [lat, lng], // Longitude first, then latitude
-      };
-      // Fetch nearby garages
-      const garages = await Model.aggregate([
-        {
-          $geoNear: {
-            near: userLocation,
-            distanceField: "distance",
-            spherical: true,
-            maxDistance: 100000, // 10km radius
-          },
-        },
-        { $sort: { distance: 1 } }, // Nearest first
-      ]);
-
-      // Handle case when no garages are found
-      if (!garages.length) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "No garages found near your location." 
-        });
-      }
-      res.status(200).json({ success: true, garages });
-    } catch (error) {
-      console.error("Error in nearByGarage:", error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Internal Server Error. Please try again later.", 
-        error: error.message 
-      });
-    }
-  });
-
   exports.addReview = (Model) =>
     catchAsync(async (req, res, next) => {
       const { garageId } = req.params;

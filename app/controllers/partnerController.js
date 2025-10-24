@@ -548,54 +548,6 @@ exports.sendWhatsAppOTP = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
-  const { id: partnerId } = req.params; // garage/vendor id
-   const userId = req.user.id;// by token we are getting  for login user)
-  const partner = await Partner.findById(partnerId);
-  if (!partner) return next(new AppError("Partner Garage not found", 404));
-
-  const user = await User.findById(userId);
-  if (!user) return next(new AppError("User not found", 404));
-
-  const ownerPhone = partner.phone;
-  const userPhone = user.phone || "N/A";
-  const userName = user.name || "A customer";
-  const garageName = partner.businessName || "Your Garage";
-
-  if (!ownerPhone)
-    return next(new AppError("Garage owner has no WhatsApp number", 400));
-
-  // ===== WhatsApp Message =====
-  const enquiryMessage = 
-`🚗 *New Customer Enquiry via Vehiculrr!*\n\n
-Hello *${garageName}*, 👋\n\n
-Great news! *${userName}* has shown interest in your garage through Vehiculrr.\n\n
-📞 *Customer Contact:* ${userPhone}\n
-💬 They are looking to know more about your services.\n\n
-This enquiry was sent from your listing on *Vehiculrr*, where we connect vehicle owners with trusted garages like yours.\n\n
-👉 Please reach out to *${userName}* at the above number, or share your service details and charges directly.\n\n
-Let’s not keep your next customer waiting!\n\n
-— *Team Vehiculrr* 🚀`;
-
-  await sendWhatsAppMessage(ownerPhone, enquiryMessage);
-
-  // ===== for Notify user also =====
-  const userMessage = 
-`Hey *${userName}* 👋,\n\n
-Your enquiry for *${garageName}* has been sent successfully via Vehiculrr.\n\n
-The garage owner will reach out to you soon at *${userPhone}*.\n\n
-Thanks for using *Vehiculrr*! 🚗`;
-
-  if (userPhone && userPhone !== "N/A") {
-    // await sendWhatsAppMessage(userPhone, userMessage);
-    await sendWhatsAppMessage(ownerPhone, userMessage);   //---testing for same number
-  }
-
-  res.status(200).json({
-    status: "success",
-    message: "WhatsApp enquiry sent successfully to garage and user.",
-  });
-});
 
 // Verify WhatsApp
 exports.verifyWhatsApp = catchAsync(async (req, res, next) => {
@@ -954,3 +906,78 @@ exports.verifyQRCode = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+exports.findNearbyPartners = catchAsync(async (req, res, next) => {
+  console.log('findNearbyPartners called with query:', req.query);
+    try {
+      let { latitude, longitude, maxDistance } = req.query;
+
+      console.log('Received coordinates:', latitude, longitude);
+
+      // Default location (Bangalore) if not provided
+      if (!latitude || !longitude) {
+        latitude = "12.9716";
+        longitude = "77.5946";
+      }
+
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+
+      // Validate coordinates
+      if (
+        isNaN(lat) ||
+        isNaN(lng) ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid latitude or longitude values!",
+        });
+      }
+
+      // Default radius (in meters)
+      const radius = maxDistance ? Number(maxDistance) : 10000; // 10 km default
+
+      // MongoDB expects [longitude, latitude]
+      const userLocation = {
+        type: "Point",
+        coordinates: [lng, lat],
+      };
+
+      // Find nearby partners using GeoJSON
+      const partners = await Partner.aggregate([
+        {
+          $geoNear: {
+            near: userLocation,
+            distanceField: "distance",
+            spherical: true,
+            maxDistance: radius,
+          },
+        },
+        { $sort: { distance: 1 } }, // Nearest first
+      ]);
+
+      if (!partners.length) {
+        return res.status(404).json({
+          success: false,
+          message: "No partners found near your location.",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        count: partners.length,
+        partners,
+      });
+    } catch (error) {
+      console.error("Error in findNearbyPartners:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal Server Error. Please try again later.",
+        error: error.message,
+      });
+    }
+  });
