@@ -909,75 +909,91 @@ exports.verifyQRCode = catchAsync(async (req, res, next) => {
 
 exports.findNearbyPartners = catchAsync(async (req, res, next) => {
   console.log('findNearbyPartners called with query:', req.query);
-    try {
-      let { latitude, longitude, maxDistance } = req.query;
 
-      console.log('Received coordinates:', latitude, longitude);
+  try {
+    let { latitude, longitude, maxDistance } = req.query;
 
-      // Default location (Bangalore) if not provided
-      if (!latitude || !longitude) {
-        latitude = "12.9716";
-        longitude = "77.5946";
-      }
+    if (!latitude || !longitude) {
+      latitude = "12.9716";
+      longitude = "77.5946"; // Bangalore default
+      console.log("Using default Bangalore coordinates.");
+    }
 
-      const lat = parseFloat(latitude);
-      const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
 
-      // Validate coordinates
-      if (
-        isNaN(lat) ||
-        isNaN(lng) ||
-        lat < -90 ||
-        lat > 90 ||
-        lng < -180 ||
-        lng > 180
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid latitude or longitude values!",
-        });
-      }
-
-      // Default radius (in meters)
-      const radius = maxDistance ? Number(maxDistance) : 10000; // 10 km default
-
-      // MongoDB expects [longitude, latitude]
-      const userLocation = {
-        type: "Point",
-        coordinates: [lng, lat],
-      };
-
-      // Find nearby partners using GeoJSON
-      const partners = await Partner.aggregate([
-        {
-          $geoNear: {
-            near: userLocation,
-            distanceField: "distance",
-            spherical: true,
-            maxDistance: radius,
-          },
-        },
-        { $sort: { distance: 1 } }, // Nearest first
-      ]);
-
-      if (!partners.length) {
-        return res.status(404).json({
-          success: false,
-          message: "No partners found near your location.",
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        count: partners.length,
-        partners,
-      });
-    } catch (error) {
-      console.error("Error in findNearbyPartners:", error);
-      res.status(500).json({
+    if (
+      isNaN(lat) ||
+      isNaN(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180
+    ) {
+      return res.status(400).json({
         success: false,
-        message: "Internal Server Error. Please try again later.",
-        error: error.message,
+        message: "Invalid latitude or longitude values!",
       });
     }
-  });
+
+    const radius = maxDistance ? Number(maxDistance) : 10000; // 10 km
+
+    const userLocation = {
+      type: "Point",
+      coordinates: [lng, lat],
+    };
+
+    // 🚀 Geo search with distance + formattedDistance
+    const partners = await Partner.aggregate([
+      {
+        $geoNear: {
+          near: userLocation,
+          distanceField: "distance",
+          spherical: true,
+          maxDistance: radius,
+        },
+      },
+      {
+        // 🧮 Add formatted distance in km with 2 decimals
+        $addFields: {
+          distanceInKm: { $round: [{ $divide: ["$distance", 1000] }, 2] },
+        },
+      },
+      { $sort: { distance: 1 } },
+      {
+        // ✂️ Optionally include only necessary fields
+        $project: {
+          fullName: 1,
+          businessName: 1,
+          phone: 1,
+          expertise: 1,
+          shopLocation: 1,
+          distanceInKm: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    if (!partners.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No partners found near your location.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: partners.length,
+      partners,
+    });
+  } catch (error) {
+    console.error("Error in findNearbyPartners:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error. Please try again later.",
+      error: error.message,
+    });
+  }
+});
+
