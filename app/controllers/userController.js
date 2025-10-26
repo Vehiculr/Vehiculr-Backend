@@ -775,7 +775,6 @@ exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
   if (!partner) return next(new AppError("Partner Garage not found", 404));
   const userId = req.user.id;
   const user = await User.findById(userId);
-  console.log('=====',user)
   if (!user) return next(new AppError("User not found", 404));
 
   const ownerPhone = partner.phone;

@@ -921,7 +921,7 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
 
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
-
+    console.log(`Searching partners near lat: ${lat}, lng: ${lng}, maxDistance: ${maxDistance || '10000 (default)'}`);
     if (
       isNaN(lat) ||
       isNaN(lng) ||
@@ -936,7 +936,7 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
       });
     }
 
-    const radius = maxDistance ? Number(maxDistance) : 10000; // 10 km
+    const radius = maxDistance ? Number(maxDistance) : 100000; // 10 km
 
     const userLocation = {
       type: "Point",
