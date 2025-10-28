@@ -93,6 +93,7 @@ const partnerSchema = new mongoose.Schema({
   email: {
     type: String
   },
+  accountType: { type: String, enum: ['user', 'partner'], default: 'partner' },
   otp: {
     type: String,
   },

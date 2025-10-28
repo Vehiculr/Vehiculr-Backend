@@ -1,22 +1,37 @@
 const twilio = require("twilio");
 require("dotenv").config();
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/appError');
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const sendWhatsAppMessage = async (to, message) => {
-    // console.log('to, message',to, message)
   try {
-    return await client.messages.create({
+    const response = await client.messages.create({
       from: process.env.TWILIO_WHATSAPP_NUMBER,
       to: `whatsapp:${to}`,
       body: message,
     });
+    console.log("✅ WhatsApp sent to:", to, "SID:", response.sid);
+    return response;
   } catch (error) {
-    console.error("WhatsApp Message Error:", error);
-    throw new Error("Failed to send WhatsApp message.");
+    console.error("❌ Twilio Full Error Object:", JSON.stringify(error, null, 2));
+
+    if (error.code === 63038) {
+      throw new AppError(
+        "Daily WhatsApp message limit reached. Please try again tomorrow.",
+        429
+      );
+    }
+
+    throw new AppError(
+      "Unable to send WhatsApp message at the moment. Please try again later.",
+      500
+    );
   }
 };
+
 
 const sendOTP = async (phone, otp) => {
   console.log(`your otp for ${phone} , is ${otp}`)

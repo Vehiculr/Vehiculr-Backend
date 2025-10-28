@@ -770,7 +770,7 @@ exports.clearVehicles = catchAsync(async (req, res, next) => {
 });
 
 exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
-  const  partnerId  = req.params.id; 
+  const partnerId = req.params.id; 
   const partner = await Partner.findById(partnerId);
   if (!partner) return next(new AppError("Partner Garage not found", 404));
   const userId = req.user.id;
@@ -786,8 +786,8 @@ exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
     return next(new AppError("Garage owner has no WhatsApp number", 400));
 
   // ===== WhatsApp Message =====
-  const enquiryMessage = 
-`🚗 *New Customer Enquiry via Vehiculrr!*\n\n
+  const enquiryMessage =
+    `🚗 *New Customer Enquiry via Vehiculrr!*\n\n
 Hello *${garageName}*, 👋\n\n
 Great news! *${userName}* has shown interest in your garage through Vehiculrr.\n\n
 📞 *Customer Contact:* ${userPhone}\n
@@ -797,22 +797,35 @@ This enquiry was sent from your listing on *Vehiculrr*, where we connect vehicle
 Let’s not keep your next customer waiting!\n\n
 — *Team Vehiculrr* 🚀`;
 
-  await sendWhatsAppMessage(ownerPhone, enquiryMessage);
+  try {
+    await sendWhatsAppMessage(ownerPhone, enquiryMessage);
 
-  // ===== for Notify user also =====
-  const userMessage = 
-`Hey *${userName}* 👋,\n\n
+    // ===== for Notify user also =====
+    const userMessage =
+      `Hey *${userName}* 👋,\n\n
 Your enquiry for *${garageName}* has been sent successfully via Vehiculrr.\n\n
 The garage owner will reach out to you soon at *${userPhone}*.\n\n
 Thanks for using *Vehiculrr*! 🚗`;
 
-  if (userPhone && userPhone !== "N/A") {
-    // await sendWhatsAppMessage(userPhone, userMessage);
-    await sendWhatsAppMessage(ownerPhone, userMessage);   //---testing for same number
+    if (userPhone && userPhone !== "N/A" && userPhone !== ownerPhone) {
+      await new Promise(r => setTimeout(r, 2000)); // delay to avoid rate limit
+      await sendWhatsAppMessage(userPhone, userMessage);
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "WhatsApp enquiry sent successfully to garage and user.",
+    });
+ } catch (err) {
+  if (err.message.includes("9 daily messages limit")) {
+    console.warn("⚠️ Twilio sandbox message limit reached — skipping WhatsApp send.");
+    return res.status(200).json({
+      status: "warning",
+      message: "Sandbox limit reached. WhatsApp message not sent, but request successful.",
+    });
   }
 
-  res.status(200).json({
-    status: "success",
-    message: "WhatsApp enquiry sent successfully to garage and user.",
-  });
+  console.error("❌ notifyGarageOwner Error:", err.message);
+  next(new AppError("Failed to send WhatsApp message.", 500));
+}
 });

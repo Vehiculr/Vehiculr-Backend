@@ -63,6 +63,7 @@ const userSchema = new mongoose.Schema({
     enum: ['Male', 'Female', 'Transgender'],
   },
   isVerified: { type: Boolean, default: false },
+  accountType: { type: String, enum: ['user', 'partner'], default: 'user' },
   dob: {
     type: Date,
     validate: {

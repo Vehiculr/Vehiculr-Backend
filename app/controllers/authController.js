@@ -31,7 +31,6 @@ const createSendToken = (account, statusCode, res) => {
 
   res.cookie('jwt', token, cookieOptions);
 
-  // user.password = undefined; // Remove password field from created User
   res.status(statusCode).json({
     status: 'success',
     message: "Login successful",
@@ -122,13 +121,19 @@ exports.login = catchAsync(async (req, res, next) => {
   ]);
 
   const account = foundUser || foundPartner;
+  if(foundPartner) {
+    account.accountType = 'partner'; 
+  }
+  else {
+    account.accountType = 'user'; 
+  }
   if (!account) {
     return res.status(404).json({
       success: false,
       message: "User or Partner not found",
     });
   }
-  // 3) Send JWT to client
+  await account.save();
   createSendToken(account, 200, res);
 });
 
@@ -298,8 +303,6 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
         username,
         _id: { $ne: user._id } // Exclude current user
       });
-console.log('usernameExists', usernameExists);  
-
       if (usernameExists) {
         return res.status(409).json({
           success: false,
@@ -543,19 +546,19 @@ exports.verifyOTP = async (req, res) => {
 exports.requestEmailOTP = async (req, res) => {
   try {
     const { email, accountType = 'user' } = req.body;
-    console.log('requestEmailOTP called with:', req.body);  
-    
+    console.log('requestEmailOTP called with:', req.body);
+
     if (!email) {
-      return res.status(400).json({ 
-        message: "Email address is required" 
+      return res.status(400).json({
+        message: "Email address is required"
       });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
-        message: "Invalid email format" 
+      return res.status(400).json({
+        message: "Invalid email format"
       });
     }
 
@@ -567,8 +570,8 @@ exports.requestEmailOTP = async (req, res) => {
       User.findOne({ email: email.toLowerCase() }),
       Partner.findOne({ email: email.toLowerCase() })
     ]);
-    console.log('requestEmailOTP called with:', foundUser, foundPartner);  
-    
+    console.log('requestEmailOTP called with:', foundUser, foundPartner);
+
     // If requesting partner and partner exists, use partner
     if (accountType === 'partner' && foundPartner) {
       account = foundPartner;
@@ -580,8 +583,8 @@ exports.requestEmailOTP = async (req, res) => {
       detectedAccountType = 'user';
     }
     // If account exists but not the requested type, return error
-    else if ((accountType === 'partner' && foundUser) || 
-             (accountType === 'user' && foundPartner)) {
+    else if ((accountType === 'partner' && foundUser) ||
+      (accountType === 'user' && foundPartner)) {
       return res.status(400).json({
         message: `Email already registered as ${foundUser ? 'user' : 'partner'}`,
         existingAccountType: foundUser ? 'user' : 'partner',
@@ -591,13 +594,13 @@ exports.requestEmailOTP = async (req, res) => {
     // No account exists, create new based on requested type
     else {
       if (accountType === 'partner') {
-        account = await Partner.create({ 
+        account = await Partner.create({
           email: email.toLowerCase(),
           emailVerified: false
         });
         detectedAccountType = 'partner';
       } else {
-        account = await User.create({ 
+        account = await User.create({
           email: email.toLowerCase(),
           emailVerified: false
         });
@@ -637,7 +640,7 @@ exports.requestEmailOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("Email OTP request error:", error);
-    
+
     // Handle duplicate key errors (if email is unique in both collections)
     if (error.code === 11000) {
       return res.status(400).json({
@@ -645,10 +648,10 @@ exports.requestEmailOTP = async (req, res) => {
         error: "Duplicate email"
       });
     }
-    
-    res.status(500).json({ 
-      message: "Server Error", 
-      error: error.message 
+
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message
     });
   }
 };
@@ -657,14 +660,14 @@ exports.requestEmailOTP = async (req, res) => {
 exports.verifyEmailOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
-    
+
     if (!email || !otp) {
-      return res.status(400).json({ 
-        message: "Email and OTP are required" 
+      return res.status(400).json({
+        message: "Email and OTP are required"
       });
     }
 
-  // Check both User and Partner collections
+    // Check both User and Partner collections
     const [foundUser, foundPartner] = await Promise.all([
       User.findOne({ email }),
       Partner.findOne({ email })
@@ -708,7 +711,7 @@ exports.verifyEmailOTP = async (req, res) => {
     await account.save();
 
     // Generate authentication token (if needed)
- // ✅ Generate JWT token with account type in payload
+    // ✅ Generate JWT token with account type in payload
     const tokenPayload = {
       id: account._id,
       phone: account.phone,
@@ -734,9 +737,9 @@ exports.verifyEmailOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("Email OTP verification error:", error);
-    res.status(500).json({ 
-      message: "Server Error", 
-      error: error.message 
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message
     });
   }
 };
@@ -946,7 +949,7 @@ exports.loginRequestOTP = catchAsync(async (req, res, next) => {
     message: "OTP sent successfully for login",
     mode: isProduction() ? "production" : "development",
     accountType,
-    ...( !isProduction() && { otp, expiresIn: `${process.env.OTP_EXPIRY || 10} minutes` }),
+    ...(!isProduction() && { otp, expiresIn: `${process.env.OTP_EXPIRY || 10} minutes` }),
   });
 });
 
@@ -969,7 +972,7 @@ exports.loginVerifyOTP = catchAsync(async (req, res, next) => {
   const accountType = foundUser ? "user" : "partner";
 
   let isValidOTP = false;
-console.log('Verifying OTP for account:', accountType, account.phone);
+  console.log('Verifying OTP for account:', accountType, account.phone);
   if (isProduction()) {
     isValidOTP = account.otp === otp && account.otpExpires > Date.now();
   } else {
