@@ -13,9 +13,15 @@ exports.addReview = async (req, res) => {
       });
     }
 
+    // ✅ Get user info from token
+    const userId = req.user.id;
+    const userName = req.user.name || req.user.fullName || "User";
+
     const newReview = new Review({
       garageId,
       garageName,
+      userId,       
+      userName,    
       vehicle,
       photo,
       rating,

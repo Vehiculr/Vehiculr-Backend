@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const reviewController = require("../controllers/quickReviewController");
+const authController = require('../controllers/authController');
 
 // Add a new quick review
-router.post("/addQuickReview", reviewController.addReview);
+router.post("/addQuickReview", authController.protect, reviewController.addReview);
 
 router.get("/getAllQuickReview", reviewController.getAllReviews);
 

@@ -12,6 +12,17 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
+     userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    
+    userName: {
+      type: String,
+      trim: true,
+    },
     vehicle: {
       type: String,
       required: true,
