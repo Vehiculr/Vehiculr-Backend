@@ -41,6 +41,12 @@ const upload = multer({
 
 router.use(apiLimiter);
 
+router.get('/count', partnerController.getPartnerCount);
+
+// Routes
+
+router.post('/', partnerController.createPartner);
+router.get('/', partnerController.getAllPartners);
 // ===== Debug Log =====
 router.use((req, res, next) => {
   console.log('🧭 Partner Route Hit:', req.originalUrl);

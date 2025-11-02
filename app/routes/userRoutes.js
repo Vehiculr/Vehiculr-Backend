@@ -61,6 +61,7 @@ router
   .route('/')
   .get(userController.getAllUsers)
   .post(userController.createUser);
+  router.get('/count', userController.getUserCount);//to get all user route
 
 // ✅ Profile routes
 router.get('/getMe', authController.protect, userController.setUserId, userController.getMe());
@@ -74,6 +75,7 @@ router.delete('/deleteMe', authController.protect, userController.deleteMe);
 router.patch('/updateVehicles', authController.protect, userController.updateVehicles);
 router.patch('/updateRideAndDrives', authController.protect, userController.updateRideAndDrives);
 router.delete('/clearVehicles', authController.protect, userController.clearVehicles);
+
 
 
 

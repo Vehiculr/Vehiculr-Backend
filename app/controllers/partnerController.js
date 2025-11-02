@@ -907,6 +907,21 @@ exports.verifyQRCode = catchAsync(async (req, res, next) => {
   }
 });
 
+//  api for the total number of partners in partner document
+exports.getPartnerCount = async (req, res) => {
+  try {
+    const totalPartners = await Partner.countDocuments(); // counts all documents
+    res.status(200).json({
+      status: 'success',
+      totalPartners,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: err.message,
+    });
+  }
+};
 exports.findNearbyPartners = catchAsync(async (req, res, next) => {
   console.log('findNearbyPartners called with query:', req.query);
 
