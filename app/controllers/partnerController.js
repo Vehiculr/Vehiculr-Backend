@@ -1,12 +1,15 @@
 const Partner = require('../models/partnerModel');
 const Brand = require('../models/brandModel');
+const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const factory = require('./handlerFactory');
 const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
 const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
 const multer = require('multer');
 const { carBrands, bikeBrands } = require('../valiations/brandValidation');
+const { sendWhatsAppMessage } = require("../services/twilioClient"); // Import Twilio utility
 const {
   generateQRData,
   generateQRImage,
@@ -23,6 +26,11 @@ const fs = require('fs');
 // const { sendWhatsAppOTP } = require('../utils/notificationService');
 // const Service = require('../models/serviceModel');
 // const PremiumPlan = require('../models/premiumPlanModel');
+
+exports.setUserId = (req, res, next) => {
+  req.params.id = req.user.id;
+  next();
+};
 
 // CREATE a new partner
 exports.createPartner = async (req, res) => {
@@ -106,6 +114,10 @@ exports.updateKYC = async (req, res) => {
   }
 };
 
+exports.getMe = () => {
+  return factory.getOne(Partner);
+};
+
 // Get partner profile
 exports.getPartnerProfile = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
@@ -122,9 +134,8 @@ exports.getPartnerProfile = catchAsync(async (req, res, next) => {
 
 // Update partner profile
 exports.updatePartnerProfile = catchAsync(async (req, res, next) => {
-  const allowedFields = ['businessName', 'shopLocation', 'businessDomain', 'description'];
+  const allowedFields = ['fullName', 'businessName', 'shopLocation', 'expertise', 'description'];
   const filteredBody = {};
-
   Object.keys(req.body).forEach(key => {
     if (allowedFields.includes(key)) {
       filteredBody[key] = req.body[key];
@@ -136,7 +147,6 @@ exports.updatePartnerProfile = catchAsync(async (req, res, next) => {
     filteredBody,
     { new: true, runValidators: true }
   );
-
   res.status(200).json({
     success: true,
     message: 'Profile updated successfully',
@@ -271,27 +281,27 @@ exports.getAvailableBrands = catchAsync(async (req, res, next) => {
 // Update partner brands
 exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
-  console.log('Request body:', partner); 
-  
+  console.log('Request body:', partner);
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
 
   const { carBrands: newCarBrands, bikeBrands: newBikeBrands } = req.body;
-  
 
-   // Initialize brands object if it doesn't exist
+
+  // Initialize brands object if it doesn't exist
   if (!partner.brands) {
     partner.brands = {
       carBrands: [],
       bikeBrands: []
     };
   }
-  
-   // Calculate total selected brands
+
+  // Calculate total selected brands
   const currentCarBrands = newCarBrands !== undefined ? newCarBrands : (partner.brands.carBrands || []);
   const currentBikeBrands = newBikeBrands !== undefined ? newBikeBrands : (partner.brands.bikeBrands || []);
-  
+
   const totalSelectedBrands = currentCarBrands.length + currentBikeBrands.length;
 
   // Check if partner exceeds free tier limit
@@ -306,7 +316,7 @@ exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   if (newCarBrands !== undefined) {
     partner.brands.carBrands = newCarBrands;
   }
-  
+
   if (newBikeBrands !== undefined) {
     partner.brands.bikeBrands = newBikeBrands;
   }
@@ -329,7 +339,7 @@ exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
 // Get partner's current brand selection
 exports.getPartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id).select('brands isPremium maxFreeBrands');
-  
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -352,7 +362,7 @@ exports.getPartnerBrands = catchAsync(async (req, res, next) => {
 // Check if partner can select more brands
 exports.checkBrandLimit = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id).select('brands isPremium maxFreeBrands');
-  
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -374,10 +384,10 @@ exports.checkBrandLimit = catchAsync(async (req, res, next) => {
 
 const uploadMultipleToCloudinary = async (files, options = {}) => {
   try {
-    const uploadPromises = files.map(file => 
+    const uploadPromises = files.map(file =>
       uploadToCloudinary(file, options)
     );
-    
+
     return await Promise.all(uploadPromises);
   } catch (error) {
     throw new Error('Batch Cloudinary upload failed: ' + error.message);
@@ -385,7 +395,7 @@ const uploadMultipleToCloudinary = async (files, options = {}) => {
 };
 
 exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
- try {
+  try {
     const partnerId = req.user.id;
 
     if (!req.files || req.files.length === 0) {
@@ -406,7 +416,7 @@ exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
     // Check current photo count
     const currentPhotoCount = partner.shopPhotos ? partner.shopPhotos.length : 0;
     const newPhotoCount = req.files.length;
-    
+
     if (currentPhotoCount + newPhotoCount > 4) {
       return res.status(400).json({
         success: false,
@@ -440,7 +450,7 @@ exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
 
     // Add new photos to existing ones
     partner.shopPhotos = [...partner.shopPhotos, ...cloudinaryDataArray];
-    
+
     // Ensure we don't exceed 4 photos (safety check)
     if (partner.shopPhotos.length > 4) {
       // Delete the excess photos from Cloudinary
@@ -538,6 +548,7 @@ exports.sendWhatsAppOTP = catchAsync(async (req, res, next) => {
   });
 });
 
+
 // Verify WhatsApp
 exports.verifyWhatsApp = catchAsync(async (req, res, next) => {
   const { otp } = req.body;
@@ -596,13 +607,13 @@ exports.subscribeToPremium = catchAsync(async (req, res, next) => {
 // Get QR code
 exports.getQRCode = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
-  const qrCodeData = await generateQRCode(partner._id);
+  // const qrCodeData = await generateQRCode(partner._id);
 
   res.status(200).json({
     success: true,
     data: {
-      qrCodeImageUrl: qrCodeData.imageUrl,
-      profileDeepLink: qrCodeData.deepLink
+      qrCodeImageUrl: partner.qrCode.qrImageData,
+      profileDeepLink: partner.qrCode.publicUrl
     }
   });
 });
@@ -669,8 +680,8 @@ exports.getPartnerFeed = catchAsync(async (req, res, next) => {
 
 // Generate QR code for partner
 exports.generateQRCode = catchAsync(async (req, res, next) => {
-   const partner = await Partner.findById(req.user.id);
-  
+  const partner = await Partner.findById(req.user.id);
+
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -706,20 +717,20 @@ exports.generateQRCode = catchAsync(async (req, res, next) => {
     data: {
       // QR code image (base64)
       qrImageDataUrl: qrImageDataUrl,
-      
+
       // Public URL that anyone can scan
       publicUrl: publicUrl,
-      
+
       // Nice display URL to show users
       displayUrl: displayUrl,
-      
+
       // Partner information
       partner: {
         garageId: partner.garageId,
         businessName: partner.businessName,
         phoneNumber: partner.phoneNumber
       },
-      
+
       // Instructions for use
       scanInstructions: {
         message: "This QR code can be scanned by ANY QR scanner app",
@@ -911,3 +922,93 @@ exports.getPartnerCount = async (req, res) => {
     });
   }
 };
+exports.findNearbyPartners = catchAsync(async (req, res, next) => {
+  console.log('findNearbyPartners called with query:', req.query);
+
+  try {
+    let { latitude, longitude, maxDistance } = req.query;
+
+    if (!latitude || !longitude) {
+      latitude = "12.9716";
+      longitude = "77.5946"; // Bangalore default
+      console.log("Using default Bangalore coordinates.");
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    console.log(`Searching partners near lat: ${lat}, lng: ${lng}, maxDistance: ${maxDistance || '10000 (default)'}`);
+    if (
+      isNaN(lat) ||
+      isNaN(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid latitude or longitude values!",
+      });
+    }
+
+    const radius = maxDistance ? Number(maxDistance) : 100000; // 10 km
+
+    const userLocation = {
+      type: "Point",
+      coordinates: [lng, lat],
+    };
+
+    // 🚀 Geo search with distance + formattedDistance
+    const partners = await Partner.aggregate([
+      {
+        $geoNear: {
+          near: userLocation,
+          distanceField: "distance",
+          spherical: true,
+          maxDistance: radius,
+        },
+      },
+      {
+        // 🧮 Add formatted distance in km with 2 decimals
+        $addFields: {
+          distanceInKm: { $round: [{ $divide: ["$distance", 1000] }, 2] },
+        },
+      },
+      { $sort: { distance: 1 } },
+      {
+        // ✂️ Optionally include only necessary fields
+        $project: {
+          fullName: 1,
+          businessName: 1,
+          phone: 1,
+          expertise: 1,
+          shopLocation: 1,
+          distanceInKm: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    if (!partners.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No partners found near your location.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: partners.length,
+      partners,
+    });
+  } catch (error) {
+    console.error("Error in findNearbyPartners:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error. Please try again later.",
+      error: error.message,
+    });
+  }
+});
+

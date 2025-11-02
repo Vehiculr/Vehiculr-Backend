@@ -12,9 +12,6 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     unique: true,
-    sparse: true,
-    lowercase: true,
-    trim: true,
     validate: {
       validator: function (v) {
         return !v || /\S+@\S+\.\S+/.test(v);
@@ -66,6 +63,7 @@ const userSchema = new mongoose.Schema({
     enum: ['Male', 'Female', 'Transgender'],
   },
   isVerified: { type: Boolean, default: false },
+  accountType: { type: String, enum: ['user', 'partner'], default: 'user' },
   dob: {
     type: Date,
     validate: {
@@ -166,6 +164,12 @@ const userSchema = new mongoose.Schema({
       select: false,
     },
   ],
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
   phone: String,
   address: {
     street: String,
@@ -188,14 +192,26 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Topic'
   }],
+   vehicles: {
+    rides: [{
+      type: String, 
+      trim: true,
+      maxlength: 50
+    }],
+    drives: [{
+      type: String, 
+      trim: true,
+      maxlength: 50
+    }]
+  },
   bikes: {
-  type: [String],
-  default: []
-},
-cars: {
-  type: [String],
-  default: []
-},
+    type: [String],
+    default: []
+  },
+  cars: {
+    type: [String],
+    default: []
+  },
 }, {
   timestamps: true
 });

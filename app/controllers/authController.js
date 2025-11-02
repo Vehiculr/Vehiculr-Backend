@@ -9,8 +9,11 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const sendEmail = require('../utils/email');
 const { sendOTP } = require('../services/twilioClient');
-const generateOTP = require('../utils/generateOTP');
+const { generateOTP } = require('../utils/generateOTP');
 const { sendWhatsAppMessage } = require('../services/twilioClient');
+require("dotenv").config();
+
+const isProduction = () => process.env.NODE_ENV === 'production';
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -19,7 +22,6 @@ const signToken = (id) => {
 };
 
 const createSendToken = (account, statusCode, res) => {
-  console.log('user in createSendToken:', account);
   const token = signToken(account._id);
   const cookieOptions = {
     expire: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
@@ -29,11 +31,9 @@ const createSendToken = (account, statusCode, res) => {
 
   res.cookie('jwt', token, cookieOptions);
 
-  // user.password = undefined; // Remove password field from created User
-  console.log('token:', token);
-
   res.status(statusCode).json({
     status: 'success',
+    message: "Login successful",
     token,
     data: {
       account,
@@ -121,16 +121,19 @@ exports.login = catchAsync(async (req, res, next) => {
   ]);
 
   const account = foundUser || foundPartner;
-
-  console.log('account:', account);
-
+  if(foundPartner) {
+    account.accountType = 'partner'; 
+  }
+  else {
+    account.accountType = 'user'; 
+  }
   if (!account) {
     return res.status(404).json({
       success: false,
       message: "User or Partner not found",
     });
   }
-  // 3) Send JWT to client
+  await account.save();
   createSendToken(account, 200, res);
 });
 
@@ -294,86 +297,66 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
       });
     }
 
-    if (user) {
-      // User exists, check if the requested username is available
-      const usernameExists = await User.findOne({ username });
-      if (usernameExists && usernameExists._id.toString() !== user._id.toString()) {
-        return res.status(409).json({
-          message: 'Username already taken by another user'
-        });
-      }
-
-      // Update the username
-      if (username) user.username = username;
-      // Optionally update other fields if provided
-      if (password) {
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-      }
-      if (firstName) user.firstName = firstName;
-      if (lastName) user.lastName = lastName;
-      if (phone) user.phone = phone;
-
-      await user.save();
-
-      return res.status(200).json({
-        message: 'Username updated successfully',
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          phone: user.phone,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          isActive: user.isActive
-        }
-      });
-    } else {
-      // User doesn't exist, check if we have enough info to create a new user
-      if (!password || !firstName || !lastName) {
-        return res.status(400).json({
-          message: 'User not found. To create a new user, please provide password, firstName, and lastName'
-        });
-      }
-
-      // Check if email is valid if identifier is an email
-      const isEmail = /^\S+@\S+\.\S+$/.test(identifier);
-
-      // Create new user
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      const newUser = new User({
+    // Check username uniqueness ONLY if username is being updated
+    if (username && username !== user.username) {
+      const usernameExists = await User.findOne({
         username,
-        email: isEmail ? identifier : undefined,
-        phone: !isEmail ? identifier : phone,
-        password: hashedPassword,
-        firstName,
-        lastName
+        _id: { $ne: user._id } // Exclude current user
       });
-
-      await newUser.save();
-
-      return res.status(201).json({
-        message: 'User created successfully',
-        user: {
-          id: newUser._id,
-          username: newUser.username,
-          email: newUser.email,
-          phone: newUser.phone,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          isActive: newUser.isActive
-        }
-      });
+      if (usernameExists) {
+        return res.status(409).json({
+          success: false,
+          message: 'username already taken by another user'
+        });
+      }
+      user.username = username;
     }
+
+    // Update other fields if provided
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+
+    // Check phone uniqueness ONLY if phone is being updated
+    if (phone && phone !== user.phone) {
+      const phoneExists = await User.findOne({
+        phone,
+        _id: { $ne: user._id } // Exclude current user
+      });
+
+      if (phoneExists) {
+        return res.status(409).json({
+          success: false,
+          message: 'Phone number already registered with another account'
+        });
+      }
+      user.phone = phone;
+    }
+
+    await user.save();
+
+    // Return updated user data (excluding sensitive information)
+    const updatedUser = await User.findById(userId).select('-password -otp -otpExpires');
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        user: updatedUser
+      }
+    });
+
   } catch (error) {
-    console.error('Error in PATCH /users/username:', error);
+    console.error('Error updating user profile:', error);
 
     // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyValue)[0];
       return res.status(409).json({
+        success: false,
         message: `${field} already exists`,
         field: field
       });
@@ -383,13 +366,15 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
+        success: false,
         message: 'Validation failed',
         errors: errors
       });
     }
 
     res.status(500).json({
-      message: 'Server error while processing user',
+      success: false,
+      message: 'Server error while updating profile',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
@@ -398,29 +383,78 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
 
 exports.requestOTP = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { phone, accountType = 'user' } = req.body; // Default to 'user'
     if (!phone) return res.status(400).json({ message: "Phone number is required" });
 
-    let user = await User.findOne({ phone });
+    let account;
+    let detectedAccountType;
 
-    if (!user) {
-      user = await User.create({ phone });
+    // Check both collections
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ phone }),
+      Partner.findOne({ phone })
+    ]);
+
+    // If requesting partner and partner exists, use partner
+    if (accountType === 'partner' && foundPartner) {
+      account = foundPartner;
+      detectedAccountType = 'partner';
+    }
+    // If requesting user and user exists, use user
+    else if (accountType === 'user' && foundUser) {
+      account = foundUser;
+      detectedAccountType = 'user';
+    }
+    // If account exists but not the requested type, return error
+    else if ((accountType === 'partner' && foundUser) || (accountType === 'user' && foundPartner)) {
+      return res.status(400).json({
+        message: `Phone number already registered as ${foundUser ? 'user' : 'partner'}`,
+        existingAccountType: foundUser ? 'user' : 'partner',
+        suggestion: 'Use a different phone number or contact support'
+      });
+    }
+    // No account exists, create new based on requested type
+    else {
+      if (accountType === 'partner') {
+        account = await Partner.create({ phone });
+        detectedAccountType = 'partner';
+      } else {
+        account = await User.create({ phone });
+        detectedAccountType = 'user';
+      }
     }
 
     const otp = generateOTP();
-    console.log(`Generated OTP for ${phone}: ${otp}`);
-    const otpExpires = new Date(Date.now() + process.env.OTP_EXPIRY * 60000); // OTP expires in X minutes
+    const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
 
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
-    const twilioResponse = await sendOTP(phone, otp);
-    if (!twilioResponse.success) {
-      return res.status(500).json({ message: "OTP sending failed", error: twilioResponse.error });
+    // Update OTP details
+    account.otp = otp;
+    account.otpExpires = otpExpires;
+    await account.save();
+
+    // Send OTP based on environment
+    const otpResponse = await sendOTP(phone, otp);
+
+    if (!otpResponse.success) {
+      return res.status(500).json({
+        message: "OTP sending failed",
+        error: otpResponse.error
+      });
     }
 
-    res.status(200).json({ message: "OTP sent successfully" });
+    res.status(200).json({
+      message: "OTP sent successfully",
+      mode: isProduction() ? 'production' : 'development',
+      accountType: detectedAccountType,
+      // Include OTP in development for testing
+      ...(!isProduction() && {
+        otp: otp,
+        expiresIn: `${process.env.OTP_EXPIRY || 10} minutes`,
+        accountId: account._id
+      })
+    });
   } catch (error) {
+    console.error("OTP request error:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
@@ -433,36 +467,280 @@ exports.verifyOTP = async (req, res) => {
       return res.status(400).json({ message: "Phone and OTP are required" });
     }
 
-    const user = await User.findOne({ phone });
-    console.log("User found for OTP verification:", user);  
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    // Check both User and Partner collections
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ phone }),
+      Partner.findOne({ phone })
+    ]);
+
+    const account = foundUser || foundPartner;
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
     }
 
-    // ✅ Proper OTP validation
-    console.log("Verifying user.otpExpires, Date.now()", user.otpExpires, Date.now());
-    if (user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
+    const accountType = foundUser ? 'user' : 'partner';
+
+    // In development, allow using the default test OTP regardless of what's stored
+    let isValidOTP = false;
+
+    if (isProduction()) {
+      // Production: Strict OTP validation
+      isValidOTP = account.otp === otp && account.otpExpires > Date.now();
+    } else {
+      // Development: Allow test OTP or actual stored OTP
+      const testOTP = process.env.DEFAULT_OTP || '12345';
+      isValidOTP = (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
+
+      if (otp === testOTP) {
+        console.log('✅ Development mode: Using test OTP');
+      }
     }
-    
 
-    // ✅ OTP is valid → mark user as verified
-    user.isVerified = true;
-    user.otp = undefined;        // clear OTP after use
-    user.otpExpires = undefined; // clear expiry
-    await user.save();
+    if (!isValidOTP) {
+      return res.status(400).json({
+        message: "Invalid or expired OTP",
+        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '12345'}`,
+        accountType: accountType
+      });
+    }
 
-    // ✅ Generate JWT token
+    // ✅ OTP is valid → mark account as verified
+    account.isVerified = true;
+    account.otp = undefined;        // clear OTP after use
+    account.otpExpires = undefined; // clear expiry
+    await account.save();
+
+    // ✅ Generate JWT token with account type in payload
+    const tokenPayload = {
+      id: account._id,
+      phone: account.phone,
+      accountType: accountType,
+      isVerified: true
+    };
+
     const token = jwt.sign(
-      { id: user._id, phone: user.phone },
+      tokenPayload,
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res.status(200).json({ message: "OTP verified successfully", token });
+    res.status(200).json({
+      message: "OTP verified successfully",
+      token,
+      accountType: accountType,
+      accountId: account._id,
+      mode: isProduction() ? 'production' : 'development',
+      // Include user/partner specific data if needed
+      ...(accountType === 'partner' && { businessName: account.businessName }),
+      ...(accountType === 'user' && { fullName: account.fullName })
+    });
   } catch (error) {
     console.error("OTP verification error:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    res.status(500).json({
+      message: "Server Error",
+      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error"
+    });
+  }
+};
+
+exports.requestEmailOTP = async (req, res) => {
+  try {
+    const { email, accountType = 'user' } = req.body;
+    console.log('requestEmailOTP called with:', req.body);
+
+    if (!email) {
+      return res.status(400).json({
+        message: "Email address is required"
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format"
+      });
+    }
+
+    let account;
+    let detectedAccountType;
+
+    // Check both collections concurrently
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ email: email.toLowerCase() }),
+      Partner.findOne({ email: email.toLowerCase() })
+    ]);
+    console.log('requestEmailOTP called with:', foundUser, foundPartner);
+
+    // If requesting partner and partner exists, use partner
+    if (accountType === 'partner' && foundPartner) {
+      account = foundPartner;
+      detectedAccountType = 'partner';
+    }
+    // If requesting user and user exists, use user
+    else if (accountType === 'user' && foundUser) {
+      account = foundUser;
+      detectedAccountType = 'user';
+    }
+    // If account exists but not the requested type, return error
+    else if ((accountType === 'partner' && foundUser) ||
+      (accountType === 'user' && foundPartner)) {
+      return res.status(400).json({
+        message: `Email already registered as ${foundUser ? 'user' : 'partner'}`,
+        existingAccountType: foundUser ? 'user' : 'partner',
+        suggestion: 'Use a different email address or contact support'
+      });
+    }
+    // No account exists, create new based on requested type
+    else {
+      if (accountType === 'partner') {
+        account = await Partner.create({
+          email: email.toLowerCase(),
+          emailVerified: false
+        });
+        detectedAccountType = 'partner';
+      } else {
+        account = await User.create({
+          email: email.toLowerCase(),
+          emailVerified: false
+        });
+        detectedAccountType = 'user';
+      }
+    }
+
+    // Generate OTP and set expiration
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
+
+    // Update OTP details
+    account.otp = otp;
+    account.otpExpires = otpExpires;
+    await account.save();
+
+    // Send OTP via email
+    const otpResponse = await sendOTP(email, otp);
+
+    if (!otpResponse.success) {
+      return res.status(500).json({
+        message: "Failed to send OTP email",
+        error: otpResponse.error
+      });
+    }
+
+    res.status(200).json({
+      message: "OTP sent successfully to your email",
+      mode: isProduction() ? 'production' : 'development',
+      accountType: detectedAccountType,
+      // Include OTP in development for testing
+      ...(!isProduction() && {
+        otp: otp,
+        expiresIn: `${process.env.OTP_EXPIRY || 10} minutes`,
+        accountId: account._id
+      })
+    });
+  } catch (error) {
+    console.error("Email OTP request error:", error);
+
+    // Handle duplicate key errors (if email is unique in both collections)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Email already exists in the system",
+        error: "Duplicate email"
+      });
+    }
+
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message
+    });
+  }
+};
+
+
+exports.verifyEmailOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        message: "Email and OTP are required"
+      });
+    }
+
+    // Check both User and Partner collections
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ email }),
+      Partner.findOne({ email })
+    ]);
+
+    const account = foundUser || foundPartner;
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const accountType = foundUser ? 'user' : 'partner';
+
+    // In development, allow using the default test OTP regardless of what's stored
+    let isValidOTP = false;
+
+    if (isProduction()) {
+      // Production: Strict OTP validation
+      isValidOTP = account.otp === otp && account.otpExpires > Date.now();
+    } else {
+      // Development: Allow test OTP or actual stored OTP
+      const testOTP = process.env.DEFAULT_OTP || '12345';
+      isValidOTP = (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
+
+      if (otp === testOTP) {
+        console.log('✅ Development mode: Using test OTP');
+      }
+    }
+
+    if (!isValidOTP) {
+      return res.status(400).json({
+        message: "Invalid or expired OTP",
+        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '12345'}`,
+        accountType: accountType
+      });
+    }
+
+    // Clear OTP and mark email as verified
+    account.otp = undefined;
+    account.otpExpires = undefined;
+    account.emailVerified = true;
+    await account.save();
+
+    // Generate authentication token (if needed)
+    // ✅ Generate JWT token with account type in payload
+    const tokenPayload = {
+      id: account._id,
+      phone: account.phone,
+      accountType: accountType,
+      isVerified: true
+    };
+
+    const token = jwt.sign(
+      tokenPayload,
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.status(200).json({
+      message: "Email verified successfully",
+      emailVerified: true,
+      token: token,
+      accountType: accountType,
+      accountId: account._id,
+      mode: isProduction() ? 'production' : 'development',
+      // Include user/partner specific data if needed
+      ...(accountType === 'partner' && { businessName: account.businessName }),
+      ...(accountType === 'user' && { fullName: account.fullName })
+    });
+  } catch (error) {
+    console.error("Email OTP verification error:", error);
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message
+    });
   }
 };
 
@@ -531,14 +809,14 @@ exports.storeUserPassword = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.checkUsernameExists = catchAsync(async (req, res, next) => {
+exports.checkusernameExists = catchAsync(async (req, res, next) => {
   const { username } = req.query;
 
   if (!username) {
-    return next(new AppError('Username is required', 400));
+    return next(new AppError('username is required', 400));
   }
 
-  const user = await User.findOne({ userName: username });
+  const user = await User.findOne({ username: username });
 
   res.status(200).json({
     status: 'success',
@@ -550,37 +828,33 @@ exports.checkUsernameExists = catchAsync(async (req, res, next) => {
 
 
 
-exports.updateUsername = catchAsync(async (req, res, next) => {
-  const { newUsername } = req.body;
+exports.updateusername = catchAsync(async (req, res, next) => {
+  const { newusername } = req.body;
 
-  if (!newUsername) {
+  if (!newusername) {
     return next(new AppError('New username is required', 400));
   }
 
-  const existingUser = await User.findOne({ userName: newUsername });
+  const existingUser = await User.findOne({ username: newusername });
 
   if (existingUser) {
-    return next(new AppError('Username already taken. Please choose another.', 409));
+    return next(new AppError('username already taken. Please choose another.', 409));
   }
 
   const updatedUser = await User.findByIdAndUpdate(
     req.user.id,
-    { userName: newUsername },
+    { username: newusername },
     { new: true, runValidators: true }
   );
 
   res.status(200).json({
     status: 'success',
-    message: 'Username updated successfully',
+    message: 'username updated successfully',
     data: {
-      userName: updatedUser.userName,
+      username: updatedUser.username,
     },
   });
 });
-
-
-
-
 
 // msg91 integration
 const msg91 = require('../services/msg91Service');
@@ -612,3 +886,110 @@ exports.verifyUserOtp = async (req, res, next) => {
     next(new AppError('OTP verification failed', 500));
   }
 };
+
+/***********************************
+ * 🔹 1️⃣ Login via Email & Password
+ ***********************************/
+exports.loginWithEmail = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password)
+    return next(new AppError("Email and password are required", 400));
+
+  // Check both User and Partner collections
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ email }).select("+password"),
+    Partner.findOne({ email }).select("+password"),
+  ]);
+
+  const account = foundUser || foundPartner;
+  if (!account) return next(new AppError("Invalid email or password", 401));
+
+  const accountType = foundUser ? "user" : "partner";
+
+  // Compare passwords
+  const isMatch = await bcrypt.compare(password, account.password);
+  if (!isMatch) return next(new AppError("Invalid email or password", 401));
+
+  createSendToken(account, 200, res);
+});
+
+/***********************************
+ * 🔹 2️⃣ Login via Phone (Request OTP)
+ ***********************************/
+exports.loginRequestOTP = catchAsync(async (req, res, next) => {
+  const { phone } = req.body;
+
+  if (!phone) return next(new AppError("Phone number is required", 400));
+
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ phone }),
+    Partner.findOne({ phone }),
+  ]);
+
+  const account = foundUser || foundPartner;
+  if (!account)
+    return next(new AppError("Account not found. Please register first.", 404));
+
+  const accountType = foundUser ? "user" : "partner";
+
+  const otp = generateOTP();
+  const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
+
+  account.otp = otp;
+  account.otpExpires = otpExpires;
+  await account.save();
+
+  const otpResponse = await sendOTP(phone, otp);
+  if (!otpResponse.success)
+    return next(new AppError("Failed to send OTP", 500));
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully for login",
+    mode: isProduction() ? "production" : "development",
+    accountType,
+    ...(!isProduction() && { otp, expiresIn: `${process.env.OTP_EXPIRY || 10} minutes` }),
+  });
+});
+
+/***********************************
+ * 🔹 3️⃣ Verify OTP (Complete Login)
+ ***********************************/
+exports.loginVerifyOTP = catchAsync(async (req, res, next) => {
+  const { phone, otp } = req.body;
+  if (!phone || !otp)
+    return next(new AppError("Phone and OTP are required", 400));
+
+  const [foundUser, foundPartner] = await Promise.all([
+    User.findOne({ phone }),
+    Partner.findOne({ phone }),
+  ]);
+
+  const account = foundUser || foundPartner;
+  if (!account) return next(new AppError("Account not found", 404));
+
+  const accountType = foundUser ? "user" : "partner";
+
+  let isValidOTP = false;
+  console.log('Verifying OTP for account:', accountType, account.phone);
+  if (isProduction()) {
+    isValidOTP = account.otp === otp && account.otpExpires > Date.now();
+  } else {
+    const testOTP = process.env.DEFAULT_OTP || "12345";
+    isValidOTP =
+      (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
+
+    if (otp === testOTP) console.log("✅ Development mode: Test OTP used");
+  }
+
+  if (!isValidOTP)
+    return next(new AppError("Invalid or expired OTP", 400));
+
+  // Clear OTP after successful login
+  account.otp = undefined;
+  account.otpExpires = undefined;
+  await account.save();
+
+  createSendToken(account, 200, res);
+});

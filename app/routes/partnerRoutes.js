@@ -1,17 +1,13 @@
 const express = require('express');
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
 const partnerController = require('../controllers/partnerController');
 const authController = require('../controllers/authController');
-const { validateKYC, validateBrands, validateServices, validateOTPRequest, validateOTPVerification } = require('../valiations/partnerValidation');
-const { otpLimiter, apiLimiter } = require('../middleware/security');
-const validation = require('../valiations/qrValidation');
-const rateLimit = require('express-rate-limit');
 const { protect, restrictTo } = authController;
+const { otpLimiter, apiLimiter } = require('../middleware/security');
+const multer = require('multer');
 const publicQrController = require('../controllers/publicQrController');
 const { validateBrandSelection } = require('../valiations/brandValidation');
-
-const multer = require('multer');
-
+const { validateOTPRequest, validateOTPVerification } = require('../valiations/partnerValidation');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -51,46 +47,41 @@ router.get('/count', partnerController.getPartnerCount);
 
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
+// ===== Debug Log =====
+router.use((req, res, next) => {
+  console.log('🧭 Partner Route Hit:', req.originalUrl);
+  next();
+});
+
+// ===== Public routes =====
+router.get('/nearby', partnerController.findNearbyPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
-router.get('/:id', partnerController.getPartnerById);
-router.get('/qr-code', partnerController.getQRCode);
-// New KYC verification route
-router.patch('/partnerKYC', authController.protect, partnerController.updateKYC);
-router.post('/generate-qr-code', authController.protect, partnerController.generateQRCode);
-
-
-// Public routes (no authentication required)
 router.get('/garage/:garageId', publicQrController.getGarageByPublicId);
 router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 
-// ==================== PARTNER ONBOARDING ROUTES ====================
-
-// ✅ Partner-specific auth
+// ===== Auth routes =====
 router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
 router.post('/verify-otp', otpLimiter, validateOTPVerification, authController.verifyOTP);
+// router.post('/login', authController.loginWithEmailPassword);
 
-// Brands and Services routes
-router.get('/my-brands',
-  protect,
-  restrictTo('partner'),
-  partnerController.getPartnerBrands
-);
+// ===== Protected partner routes =====
+router.get('/getMe', protect, partnerController.setUserId, partnerController.getMe());
+router.get('/qr-code', protect, partnerController.getQRCode);
+router.post('/generate-qr-code', protect, partnerController.generateQRCode);
+router.patch('/partnerKYC', protect, partnerController.updateKYC);
+router.patch('/updatePartnerProfile', protect, partnerController.updatePartnerProfile);
+router.patch('/updatePartnerBrands', protect, validateBrandSelection, partnerController.updatePartnerBrands);
+router.patch('/uploadShopPhotos', upload.array('photos', 4), protect, partnerController.uploadShopPhotos);
+router.get('/check-limit', protect, restrictTo('partner'), partnerController.checkBrandLimit);
+router.get('/my-brands', protect, restrictTo('partner'), partnerController.getPartnerBrands);
 
-router.get('/check-limit',
-  protect,
-  restrictTo('partner'),
-  partnerController.checkBrandLimit
-);
+// ===== General routes =====
+router.post('/', partnerController.createPartner);
+router.get('/', partnerController.getAllPartners);
 
-// PATCH route for updating brands
-router.patch('/updatePartnerBrands',
-  protect,
-  // restrictTo('partner'),
-  validateBrandSelection,
-  partnerController.updatePartnerBrands
-);
+// ===== Must always be LAST =====
+router.get('/:id', partnerController.getPartnerById);
 
-router.patch('/uploadShopPhotos', upload.array('photos', 4), authController.protect, partnerController.uploadShopPhotos);
 
 // QR Code generation route
 // router.get('/qr-code',

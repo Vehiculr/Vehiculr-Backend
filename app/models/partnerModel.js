@@ -32,7 +32,7 @@ const brandsSchema = new mongoose.Schema({
   bikeBrands: [{
     type: String,
     enum: ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS', 'Honda', 'Yamaha',
-      'Kawasaki', 'Ducati', 'Benelli', 'BMW']
+      'Kawasaki', 'Ducati', 'Benelli', 'BMW','Royal Enfield','HarleyDavidson','BMW Motorrad']
   }]
 }, { _id: false });
 
@@ -56,7 +56,7 @@ const partnerSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: false,
+      required: false, // [longitude, latitude]
     },
   },
   shopPhotos: [{
@@ -90,6 +90,16 @@ const partnerSchema = new mongoose.Schema({
     unique: true,
     match: [/^\+91[0-9]{10}$/, 'Please enter a valid Indian phone number with +91']
   },
+  email: {
+    type: String
+  },
+  accountType: { type: String, enum: ['user', 'partner'], default: 'partner' },
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
   expertise: {
     type: [String],
     enum: ['Off-Roads', 'Vintages', 'Luxury Automobile'],
@@ -108,7 +118,31 @@ const partnerSchema = new mongoose.Schema({
   maxFreeBrands: {
     type: Number,
     default: 50   // brand limit befeoreIncreased limit for free accounts
-  }
+  },
+
+  // QR Code data
+  qrCode: {
+    publicUrl: {
+      type: String,
+      required: false
+    },
+    displayUrl: {
+      type: String,
+      required: false
+    },
+    qrImageData: {
+      type: String, // This will store the Data URL of the QR code image
+      required: false
+    },
+    generatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
 
 }, { timestamps: true });
 
@@ -118,7 +152,9 @@ partnerSchema.pre('save', function (next) {
   if (!this.garageId && this._id) {
     this.garageId = `GAR${this._id.toString().slice(-5).toUpperCase()}`;
   }
-
+ if (this.isModified('qrCode')) {
+    this.qrCode.lastUpdated = new Date();
+ }
   // Initialize brands object if not exists
   if (!this.brands) {
     this.brands = {
@@ -126,8 +162,10 @@ partnerSchema.pre('save', function (next) {
       bikeBrands: []
     };
   }
+  
 
   next();
 });
+partnerSchema.index({ shopLocation: '2dsphere' });
 
 module.exports = mongoose.model('Partner', partnerSchema);

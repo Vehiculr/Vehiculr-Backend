@@ -22,6 +22,9 @@ const feedRouter = require('./app/routes/feedRoutes');
 const { securityMiddleware } = require('./app/middleware/security');
 //partner Api
 const partnerRouter = require('./app/routes/partnerRoutes');
+const otpRouter = require('./app/routes/otpRoutes');
+const authRouter = require('./app/routes/authRoutes');
+const quickReviewRouter = require('./app/routes/quickReviewRoutes');
 
 
 
@@ -83,6 +86,9 @@ app.use('/api/garages', garageRouter);
 app.use('/api/city', cityRouter);
 app.use('/api/feed', feedRouter);
 app.use('/api/partners', partnerRouter);
+app.use('/api/otps', otpRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/quickReviews', quickReviewRouter);
 
 
 app.all('*', (req, res, next) => {

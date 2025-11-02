@@ -51,7 +51,10 @@ router.post('/logout', authController.logout);
 router.post('/forgotPassword', authController.forgotPassword);
 router.post('/request-otp', authController.requestOTP);
 router.post('/verify-otp', authController.verifyOTP);
+router.post('/request-email-otp', authController.requestEmailOTP);
+router.post('/verify-email-otp', authController.verifyEmailOTP);
 router.post('/store-password', authController.storeUserPassword);
+router.post('/:id/notify', authController.protect, userController.notifyGarageOwner);
 
 // ✅ User routes
 router
@@ -61,14 +64,17 @@ router
   router.get('/count', userController.getUserCount);//to get all user route
 
 // ✅ Profile routes
+router.get('/getMe', authController.protect, userController.setUserId, userController.getMe());
+router.get('/getUserVehicles', authController.protect, userController.getUserVehicles);
 router.route('/:id').get(userController.getUser);
-router.get('/getMe', userController.setUserId, userController.getMe());
 router.patch('/createPassword', authController.protect, userController.createPassword);
 router.patch('/updatePassword', authController.protect, authController.updatePassword);
 router.patch('/updateProfilePhoto', upload.single('file'), authController.protect, userController.updateProfilePhoto);
 router.patch('/updateUserProfile', authController.protect, authController.updateUserProfile);
 router.delete('/deleteMe', authController.protect, userController.deleteMe);
-router.patch('/updateVehicles',authController.protect,userController.updateVehicles);
+router.patch('/updateVehicles', authController.protect, userController.updateVehicles);
+router.patch('/updateRideAndDrives', authController.protect, userController.updateRideAndDrives);
+router.delete('/clearVehicles', authController.protect, userController.clearVehicles);
 
 
 

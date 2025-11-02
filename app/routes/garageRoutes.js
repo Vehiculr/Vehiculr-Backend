@@ -15,10 +15,6 @@ router
 //   router.use(garageController.filterGarages);
 
 router
-  .route("/nearby")
-  .get(garageController.nearByGarage); // ✅ near by garages
-
-router
   .route('/:id')
   .get(garageController.getGarage)
   .patch(garageController.updateGarage)
@@ -30,9 +26,6 @@ router
   .put(garageController.updateGarageReview)
   .delete(garageController.deleteGarageReview)
   
-router
-  .route("/:id/notify")
-  .post(garageController.notifyGarageOwner); // ✅ New Route
 
 
 module.exports = router;

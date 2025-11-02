@@ -1,5 +1,7 @@
 const multer = require('multer');
 const User = require('../models/userModel');
+const Partner = require('../models/partnerModel');
+const Enquiry = require("../models/enquiryModel");
 const factory = require('./handlerFactory');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
@@ -8,6 +10,7 @@ const Topic = require('../models/topicsModel');
 const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
 const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
+const { sendWhatsAppMessage } = require("../services/twilioClient"); // Import Twilio utility
 
 
 exports.setUserId = (req, res, next) => {
@@ -644,10 +647,11 @@ exports.deleteCoverPhoto = catchAsync(async (req, res, next) => {
     });
   }
 })
+
 // PATCH controller for adding vehicles
 exports.updateVehicles = catchAsync(async (req, res, next) => {
   try {
-    const userId = req.user.id; // taken from token (protect middleware)
+    const userId = req.user.id;
     const { bikes, cars } = req.body;
 
     const user = await User.findByIdAndUpdate(
@@ -697,5 +701,155 @@ exports.getUserCount = catchAsync(async (req, res, next) => {
       message: 'Error fetching user count',
       error: err.message,
     });
+  }
+});
+
+// Update user vehicles (rides and drives)
+exports.updateRideAndDrives = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+  const { rides, drives } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  // Initialize vehicles object if it doesn't exist
+  if (!user.vehicles) {
+    user.vehicles = {
+      rides: [],
+      drives: []
+    };
+  }
+
+  // Update rides if provided (remove duplicates)
+  if (rides !== undefined) {
+    const uniqueRides = [...new Set(rides.map(ride => ride.trim()))].filter(ride => ride);
+    user.vehicles.rides = uniqueRides;
+  }
+
+  // Update drives if provided (remove duplicates)
+  if (drives !== undefined) {
+    const uniqueDrives = [...new Set(drives.map(drive => drive.trim()))].filter(drive => drive);
+    user.vehicles.drives = uniqueDrives;
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Vehicles updated successfully',
+    data: {
+      vehicles: user.vehicles
+    }
+  });
+});
+
+// Get user vehicles
+exports.getUserVehicles = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+console.log('getUserVehicles==>', userId)
+  const user = await User.findById(userId).select('vehicles');
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      vehicles: user.vehicles || { rides: [], drives: [] }
+    }
+  });
+});
+
+// Clear all vehicles
+exports.clearVehicles = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  user.vehicles = {
+    rides: [],
+    drives: []
+  };
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Vehicles cleared successfully',
+    data: {
+      vehicles: user.vehicles
+    }
+  });
+});
+
+exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
+  const partnerId = req.params.id;
+  const partner = await Partner.findById(partnerId);
+  if (!partner) return next(new AppError("Partner Garage not found", 404));
+  
+  const userId = req.user.id;
+  const user = await User.findById(userId);
+  if (!user) return next(new AppError("User not found", 404));
+
+  const ownerPhone = partner.phone;
+  const userPhone = user.phone || "N/A";
+  const userName = user.name || "A customer";
+  const garageName = partner.businessName || "Your Garage";
+
+  if (!ownerPhone)
+    return next(new AppError("Garage owner has no WhatsApp number", 400));
+
+  const enquiryMessage =
+    `🚗 *New Customer Enquiry via Vehiculrr!*\n\n
+Hello *${garageName}*, 👋\n\n
+Great news! *${userName}* has shown interest in your garage through Vehiculrr.\n\n
+📞 *Customer Contact:* ${userPhone}\n
+💬 They are looking to know more about your services.\n\n
+This enquiry was sent from your listing on *Vehiculrr*, where we connect vehicle owners with trusted garages like yours.\n\n
+👉 Please reach out to *${userName}* at the above number, or share your service details and charges directly.\n\n
+Let’s not keep your next customer waiting!\n\n
+— *Team Vehiculrr* 🚀`; 
+
+ const userMessage =
+      `Hey *${userName}* 👋,\n\n
+Your enquiry for *${garageName}* has been sent successfully via Vehiculrr.\n\n
+The garage owner will reach out to you soon at *${userPhone}*.\n\n
+Thanks for using *Vehiculrr*! 🚗`;
+
+  try {
+    await Enquiry.create({
+      userId,
+      partnerId,
+      messageToPartner: enquiryMessage,
+      messageToUser: userMessage
+    });
+
+    await sendWhatsAppMessage(ownerPhone, enquiryMessage);
+
+    if (userPhone && userPhone !== "N/A" && userPhone !== ownerPhone) {
+      await new Promise(r => setTimeout(r, 2000)); 
+      await sendWhatsAppMessage(userPhone, userMessage);
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "WhatsApp enquiry sent and recorded successfully ✅",
+    });
+
+  } catch (err) {
+    if (err.message.includes("9 daily messages limit")) {
+      return res.status(200).json({
+        status: "warning",
+        message: "Sandbox limit reached. Message stored but not sent.",
+      });
+    }
+
+    console.error("❌ notifyGarageOwner Error:", err.message);
+    next(new AppError("Failed to send WhatsApp message.", 500));
   }
 });
