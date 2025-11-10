@@ -135,6 +135,18 @@ const extractPublicId = (url) => {
   return matches ? matches[1] : null;
 };
 
+const uploadMultipleToCloudinary = async (files, options = {}) => {
+  try {
+    const uploadPromises = files.map(file =>
+      uploadToCloudinary(file, options)
+    );
+
+    return await Promise.all(uploadPromises);
+  } catch (error) {
+    throw new Error('Batch Cloudinary upload failed: ' + error.message);
+  }
+};
+
 module.exports = {
   cloudinary,
   uploadAvatar,
@@ -143,4 +155,5 @@ module.exports = {
   deleteFromCloudinary,
   getOptimizedUrl,
   extractPublicId,
+  uploadMultipleToCloudinary,
 };

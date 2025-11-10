@@ -5,7 +5,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
 const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
-const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
+const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
 const multer = require('multer');
 const { carBrands, bikeBrands } = require('../valiations/brandValidation');
@@ -381,18 +381,6 @@ exports.checkBrandLimit = catchAsync(async (req, res, next) => {
     }
   });
 });
-
-const uploadMultipleToCloudinary = async (files, options = {}) => {
-  try {
-    const uploadPromises = files.map(file =>
-      uploadToCloudinary(file, options)
-    );
-
-    return await Promise.all(uploadPromises);
-  } catch (error) {
-    throw new Error('Batch Cloudinary upload failed: ' + error.message);
-  }
-};
 
 exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
   try {
@@ -936,7 +924,6 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
 
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
-    console.log(`Searching partners near lat: ${lat}, lng: ${lng}, maxDistance: ${maxDistance || '10000 (default)'}`);
     if (
       isNaN(lat) ||
       isNaN(lng) ||
@@ -951,32 +938,38 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
       });
     }
 
-    const radius = maxDistance ? Number(maxDistance) : 100000; // 10 km
+    // If the user provides maxDistance, treat it as kilometers (km)
+    // Convert km -> meters for MongoDB. Default = 10 km => 10000 meters
+    const radiusMeters = maxDistance ? Number(maxDistance) * 1000 : 10000;
+
+    if (isNaN(radiusMeters) || radiusMeters < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid maxDistance value!",
+      });
+    }
 
     const userLocation = {
       type: "Point",
       coordinates: [lng, lat],
     };
 
-    // 🚀 Geo search with distance + formattedDistance
     const partners = await Partner.aggregate([
       {
         $geoNear: {
           near: userLocation,
           distanceField: "distance",
           spherical: true,
-          maxDistance: radius,
+          maxDistance: radiusMeters, // meters
         },
       },
       {
-        // 🧮 Add formatted distance in km with 2 decimals
         $addFields: {
           distanceInKm: { $round: [{ $divide: ["$distance", 1000] }, 2] },
         },
       },
       { $sort: { distance: 1 } },
       {
-        // ✂️ Optionally include only necessary fields
         $project: {
           fullName: 1,
           businessName: 1,

@@ -90,6 +90,9 @@ app.use('/api/otps', otpRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/quickReviews', quickReviewRouter);
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'success', message: 'Server is healthy 🚀' });
+});
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));

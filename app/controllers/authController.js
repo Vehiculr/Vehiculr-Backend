@@ -5,6 +5,7 @@ const { promisify } = require('util');
 const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
 const Partner = require('../models/partnerModel');
+const masterServices = require("../services/partnerMasterServices"); // <-- require master list
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const sendEmail = require('../utils/email');
@@ -508,6 +509,11 @@ exports.verifyOTP = async (req, res) => {
     account.isVerified = true;
     account.otp = undefined;        // clear OTP after use
     account.otpExpires = undefined; // clear expiry
+    // ✅ If account is Partner → Initialize default Services only if not already set
+    if (accountType === 'partner' && (!account.services || account.services.length === 0)) {
+      account.services = masterServices;
+      console.log("✅ Default services assigned to partner:", account.phone);
+    }
     await account.save();
 
     // ✅ Generate JWT token with account type in payload

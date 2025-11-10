@@ -32,7 +32,7 @@ const brandsSchema = new mongoose.Schema({
   bikeBrands: [{
     type: String,
     enum: ['Aprilia', 'Hero', 'Bajaj', 'Hero Motocorp', 'TVS', 'Honda', 'Yamaha',
-      'Kawasaki', 'Ducati', 'Benelli', 'BMW','Royal Enfield','HarleyDavidson','BMW Motorrad']
+      'Kawasaki', 'Ducati', 'Benelli', 'BMW', 'Royal Enfield', 'HarleyDavidson', 'BMW Motorrad']
   }]
 }, { _id: false });
 
@@ -52,12 +52,19 @@ const partnerSchema = new mongoose.Schema({
   shopLocation: {
     type: {
       type: String,
-      default: 'Point',
+      enum: ['Point'],
+      default: 'Point'
     },
     coordinates: {
-      type: [Number],
-      required: false, // [longitude, latitude]
-    },
+      type: [Number], // [longitude, latitude]
+      default: [0, 0],
+      required: true
+    }
+  },
+  experience: {
+    type: Number, // years of experience
+    required: false,
+    min: 0,
   },
   shopPhotos: [{
     public_id: {
@@ -93,6 +100,11 @@ const partnerSchema = new mongoose.Schema({
   email: {
     type: String
   },
+  vehicleTypes: {
+    type: [String],
+    enum: ["Car", "Bike"],
+    required: true
+  },
   accountType: { type: String, enum: ['user', 'partner'], default: 'partner' },
   otp: {
     type: String,
@@ -109,7 +121,17 @@ const partnerSchema = new mongoose.Schema({
 
   // CORRECTED: Use the brandsSchema
   brands: brandsSchema,
-
+  services: [
+    {
+      categoryName: { type: String, required: true },
+      subServices: [
+        {
+          name: { type: String, required: true },
+          selected: { type: Boolean, default: false }
+        }
+      ]
+    }
+  ],
   isPremium: {
     type: Boolean,
     default: false
@@ -152,9 +174,9 @@ partnerSchema.pre('save', function (next) {
   if (!this.garageId && this._id) {
     this.garageId = `GAR${this._id.toString().slice(-5).toUpperCase()}`;
   }
- if (this.isModified('qrCode')) {
+  if (this.isModified('qrCode')) {
     this.qrCode.lastUpdated = new Date();
- }
+  }
   // Initialize brands object if not exists
   if (!this.brands) {
     this.brands = {

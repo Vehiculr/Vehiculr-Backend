@@ -1,11 +1,16 @@
 const Review = require("../models/quickReviewModel");
-const Partner = require("../models/partnerModel");  
+const Partner = require("../models/partnerModel");
+const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
+const cloudinary = require("cloudinary").v2;
 
 // Add a Quick Review
 exports.addReview = async (req, res) => {
+  console.log("Add Review Request Received");
   try {
-    const { garageId, garageName, vehicle, photo, rating, description, tags } = req.body;
+    const { garageId, garageName, vehicle, rating, description, tags } = req.body;
+console.log("Received review data:", req.body);
 
+    // ✅ Basic Validation
     if (!garageId || !garageName || !vehicle || !rating) {
       return res.status(400).json({
         success: false,
@@ -13,17 +18,46 @@ exports.addReview = async (req, res) => {
       });
     }
 
-    // ✅ Get user info from token
+    // ✅ User details from token
     const userId = req.user.id;
     const userName = req.user.name || req.user.fullName || "User";
 
+    // ✅ Photo Upload Handling (if images exist)
+    let reviewPhotos = [];
+
+    if (req.files && req.files.length > 0) {
+      if (req.files.length > 4) {
+        return res.status(400).json({
+          success: false,
+          message: "Maximum 4 images allowed for a review.",
+        });
+      }
+
+      const uploadResults = await uploadMultipleToCloudinary(req.files, {
+        folder: 'review-photos',
+        transformation: [
+          { width: 1200, height: 900, crop: "limit", quality: "auto" }
+        ]
+      });
+
+      reviewPhotos = uploadResults.map(result => ({
+        public_id: result.public_id,
+        url: result.secure_url,
+        width: result.width,
+        height: result.height,
+        bytes: result.bytes,
+        created_at: result.created_at,
+      }));
+    }
+
+    // ✅ Create Review Entry
     const newReview = new Review({
       garageId,
       garageName,
-      userId,       
-      userName,    
+      userId,
+      userName,
       vehicle,
-      photo,
+      photos: reviewPhotos, // ✅ Saved Cloudinary Photos
       rating,
       description,
       tags,
@@ -36,6 +70,7 @@ exports.addReview = async (req, res) => {
       message: "Review added successfully.",
       data: newReview,
     });
+
   } catch (error) {
     console.error("Error adding review:", error);
     res.status(500).json({

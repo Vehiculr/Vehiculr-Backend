@@ -46,7 +46,7 @@ exports.generateQRImage = async (qrData, options = {}) => {
 // Generate PUBLIC URL that anyone can access
 exports.generatePublicQRUrl = (partner) => {
   const garageId = partner.garageId || `GAR${partner._id.toString().slice(-5)}`;
-  return `${BASE_URL}/api/partners/profile/${garageId}`;
+  return `http://localhost:3000/reviewPage`;
 };
 
 // Generate SHORT readable URL for QR

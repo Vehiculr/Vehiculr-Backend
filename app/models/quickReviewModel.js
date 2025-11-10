@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const reviewSchema = new mongoose.Schema(
   {
     garageId: {
-     type: mongoose.Schema.Types.Mixed,
+      type: mongoose.Schema.Types.Mixed,
       ref: "Partner",
       required: true,
     },
@@ -13,12 +13,12 @@ const reviewSchema = new mongoose.Schema(
       trim: true,
     },
 
-     userId: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      // required: true,
     },
-    
+
     userName: {
       type: String,
       trim: true,
@@ -28,10 +28,16 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    photo: {
-      type: String, // optional image URL or file path
-      default: null,
-    },
+    photos: [
+      {
+        public_id: String,
+        url: String,
+        width: Number,
+        height: Number,
+        bytes: Number,
+        created_at: String
+      }
+    ],
     rating: {
       type: Number,
       required: true,
