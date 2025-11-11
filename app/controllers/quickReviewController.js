@@ -1,14 +1,14 @@
-const Review = require("../models/quickReviewModel");
+const quickReview = require("../models/quickReviewModel");
 const Partner = require("../models/partnerModel");
 const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
 
 // Add a Quick Review
-exports.addReview = async (req, res) => {
+exports.addQuickReview = async (req, res) => {
   console.log("Add Review Request Received");
   try {
     const { garageId, garageName, vehicle, rating, description, tags } = req.body;
-console.log("Received review data:", req.body);
+console.log("Received quickReview data:", req.body);
 
     // ✅ Basic Validation
     if (!garageId || !garageName || !vehicle || !rating) {
@@ -18,10 +18,6 @@ console.log("Received review data:", req.body);
       });
     }
 
-    // ✅ User details from token
-    const userId = req.user.id;
-    const userName = req.user.name || req.user.fullName || "User";
-
     // ✅ Photo Upload Handling (if images exist)
     let reviewPhotos = [];
 
@@ -29,12 +25,12 @@ console.log("Received review data:", req.body);
       if (req.files.length > 4) {
         return res.status(400).json({
           success: false,
-          message: "Maximum 4 images allowed for a review.",
+          message: "Maximum 4 images allowed for a quickReview.",
         });
       }
 
       const uploadResults = await uploadMultipleToCloudinary(req.files, {
-        folder: 'review-photos',
+        folder: 'quickReview-photos',
         transformation: [
           { width: 1200, height: 900, crop: "limit", quality: "auto" }
         ]
@@ -51,11 +47,9 @@ console.log("Received review data:", req.body);
     }
 
     // ✅ Create Review Entry
-    const newReview = new Review({
+    const newReview = new quickReview({
       garageId,
       garageName,
-      userId,
-      userName,
       vehicle,
       photos: reviewPhotos, // ✅ Saved Cloudinary Photos
       rating,
@@ -82,9 +76,9 @@ console.log("Received review data:", req.body);
 };
 
 // Get All Reviews (Optional)
-exports.getAllReviews = async (req, res) => {
+exports.getAllQuickReviews = async (req, res) => {
   try {
-    const reviews = await Review.find().sort({ createdAt: -1 });
+    const reviews = await quickReview.find().sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: reviews });
   } catch (error) {
     res.status(500).json({
@@ -96,7 +90,7 @@ exports.getAllReviews = async (req, res) => {
 };
 
 // Get Reviews by Garage ID
-exports.getReviewsByGarage = async (req, res) => {
+exports.getQuickReviewsByGarage = async (req, res) => {
   try {
     const { garageId } = req.params;
 
@@ -118,6 +112,47 @@ exports.getReviewsByGarage = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal Server Error.",
+      error: error.message,
+    });
+  }
+};
+
+// update reviewer info
+exports.updateReviewerInfo = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { reviewerName, reviewerPhone } = req.body;
+
+    if (!reviewerName || !reviewerPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Reviewer Name and Phone are required",
+      });
+    }
+
+    const updatedReview = await quickReview.findByIdAndUpdate(
+      reviewId,
+      { reviewerName, reviewerPhone },
+      { new: true }
+    );
+
+    if (!updatedReview) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Reviewer details updated successfully",
+      data: updatedReview,
+    });
+  } catch (error) {
+    console.error("Error updating reviewer info:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
       error: error.message,
     });
   }

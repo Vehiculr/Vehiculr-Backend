@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const multer = require('multer');
-const reviewController = require("../controllers/quickReviewController");
+const quickReviewController = require("../controllers/quickReviewController");
 const authController = require('../controllers/authController');
 
 // Add a new quick review
- const fs = require('fs');
-  const path = require('path');
+const fs = require('fs');
+const path = require('path');
 
 const uploadDir = path.join(process.cwd(), 'uploads');
 
@@ -43,10 +43,13 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-router.post("/addQuickReview", upload.array('photos', 4), authController.protect, reviewController.addReview);
+router.post("/addQuickReview", upload.array('photos', 4), quickReviewController.addQuickReview);
 
-router.get("/getAllQuickReview", reviewController.getAllReviews);
+router.get("/getAllQuickReviews", quickReviewController.getAllQuickReviews);
 
-router.get("/:garageId", reviewController.getReviewsByGarage);
+router.get("/:garageId", quickReviewController.getQuickReviewsByGarage);
+
+router.patch("/updateReviewer/:reviewId", quickReviewController.updateReviewerInfo);
+
 
 module.exports = router;

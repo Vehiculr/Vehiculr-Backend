@@ -1,35 +1,52 @@
 const express = require('express');
 const reviewController = require('../controllers/reviewController');
+const router = express.Router();
+const multer = require('multer');
 const authController = require('../controllers/authController');
 
-const router = express.Router({ mergeParams: true });
+// Add a new review
+ const fs = require('fs');
+  const path = require('path');
 
-// All routes below require authentication
-router.use(authController.protect);
+const uploadDir = path.join(process.cwd(), 'uploads');
 
-// GET all reviews & POST a new review
-router
-  .route('/')
-  .get(
-    reviewController.filterReviews,
-    reviewController.setHouseUserIds,
-    reviewController.getUserReviews
-  )
-  .post(
-    authController.restrictTo('user', 'owner'),
-    reviewController.setHouseUserIds,
-    reviewController.createReview
-  );
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-// The routes below require specific roles
-router.use(authController.restrictTo('user', 'admin', 'owner'));
-router.use(reviewController.filterReviews);
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function (req, file, cb) {
+    // Create a unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
+  }
+});
 
-// GET single review, UPDATE, DELETE
-router
-  .route('/:id')
-  .get(reviewController.getReview)
-  .patch(reviewController.updateReview)
-  .delete(reviewController.deleteReview);
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
+
+router.post("/addReview", upload.array('photos', 4), authController.protect, reviewController.addReview);
+
+router.get("/getAllReview", reviewController.getAllReviews);
+
+router.get("/:garageId", reviewController.getReviewsByGarage);
 
 module.exports = router;

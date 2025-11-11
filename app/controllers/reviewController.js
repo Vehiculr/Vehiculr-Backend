@@ -1,27 +1,124 @@
-const Review = require('../models/reviewModel');
-const factory = require('./handlerFactory');
-const catchAsync = require('../utils/catchAsync');
+const Review = require("../models/reviewModel");
+const Partner = require("../models/partnerModel");
+const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
+const cloudinary = require("cloudinary").v2;
 
-// Middleware to filter reviews by house or user
-exports.filterReviews = catchAsync(async (req, res, next) => {
-  if (req.params.houseId) {
-    req.docFilter = { house: req.params.houseId };
-  } else {
-    req.docFilter = { user: req.user.id };
+// Add a Quick Review
+exports.addReview = async (req, res) => {
+  console.log("Add Review Request Received");
+  try {
+    const { garageId, garageName, vehicleType, rating, description, tags } = req.body;
+console.log("Received review data:", req.body);
+
+    // ✅ Basic Validation
+    if (!garageId || !garageName || !vehicleType || !rating) {
+      return res.status(400).json({
+        success: false,
+        message: "Garage ID, Garage Name, Vehicle, and Rating are required.",
+      });
+    }
+
+    // ✅ User details from token
+    const userId = req.user.id;
+    const userName = req.user.name || req.user.fullName || "User";
+
+    // ✅ Photo Upload Handling (if images exist)
+    let reviewPhotos = [];
+
+    if (req.files && req.files.length > 0) {
+      if (req.files.length > 4) {
+        return res.status(400).json({
+          success: false,
+          message: "Maximum 4 images allowed for a review.",
+        });
+      }
+
+      const uploadResults = await uploadMultipleToCloudinary(req.files, {
+        folder: 'review-photos',
+        transformation: [
+          { width: 1200, height: 900, crop: "limit", quality: "auto" }
+        ]
+      });
+
+      reviewPhotos = uploadResults.map(result => ({
+        public_id: result.public_id,
+        url: result.secure_url,
+        width: result.width,
+        height: result.height,
+        bytes: result.bytes,
+        created_at: result.created_at,
+      }));
+    }
+
+    // ✅ Create Review Entry
+    const newReview = new Review({
+      garageId,
+      garageName,
+      userId,
+      userName,
+      vehicleType,
+      photos: reviewPhotos, // ✅ Saved Cloudinary Photos
+      rating,
+      description,
+      tags,
+    });
+
+    await newReview.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Review added successfully.",
+      data: newReview,
+    });
+
+  } catch (error) {
+    console.error("Error adding review:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error.",
+      error: error.message,
+    });
   }
-  next();
-});
-
-// Set house and user IDs in request body if missing
-exports.setHouseUserIds = (req, res, next) => {
-  if (!req.body.house) req.body.house = req.params.houseId;
-  if (!req.body.user) req.body.user = req.user.id;
-  next();
 };
 
-// Controller methods using handlerFactory
-exports.getUserReviews = factory.getAll(Review);
-exports.getReview = factory.getOne(Review, { path: 'user' });
-exports.createReview = factory.createOne(Review);
-exports.updateReview = factory.updateOne(Review);
-exports.deleteReview = factory.deleteOne(Review);
+// Get All Reviews (Optional)
+exports.getAllReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: reviews });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch reviews.",
+      error: error.message,
+    });
+  }
+};
+
+// Get Reviews by Garage ID
+exports.getReviewsByGarage = async (req, res) => {
+  try {
+    const { garageId } = req.params;
+
+    const partner = await Partner.findOne({ garageId });
+
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        message: `No partner found with garageId: ${garageId}`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      partner,
+    });
+  } catch (error) {
+    console.error("Error fetching partner by garageId:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error.",
+      error: error.message,
+    });
+  }
+};

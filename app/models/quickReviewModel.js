@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const reviewSchema = new mongoose.Schema(
+const quickReviewSchema = new mongoose.Schema(
   {
     garageId: {
       type: mongoose.Schema.Types.Mixed,
@@ -10,17 +10,6 @@ const reviewSchema = new mongoose.Schema(
     garageName: {
       type: String,
       required: true,
-      trim: true,
-    },
-
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      // required: true,
-    },
-
-    userName: {
-      type: String,
       trim: true,
     },
     vehicle: {
@@ -54,8 +43,17 @@ const reviewSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    reviewerPhone: {
+      type: String,
+      sparse: true,
+      trim: true
+    },
+    reviewerName: {
+      type: String,
+      // required: [true, 'Please tell us your name!'],
+    },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("quickReview", reviewSchema);
+module.exports = mongoose.model("quickReview", quickReviewSchema);

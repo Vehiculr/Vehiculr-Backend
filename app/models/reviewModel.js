@@ -1,66 +1,62 @@
 const mongoose = require('mongoose');
-const House = require('./houseModel');
 
 const reviewSchema = new mongoose.Schema(
   {
-    title: {
+    garageId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: "Partner",
+      required: true,
+    },
+    garageName: {
       type: String,
-      required: [true, 'Review title can not be empty!'],
+      required: true,
+      trim: true,
     },
-    description: {
-      liked: {
-        type: String,
-        minlength: [20, 'Possitive description must have atleast 20 characters'],
-      },
-      disliked: {
-        type: String,
-        minlength: [20, 'Negative description must have atleast 5 characters'],
-      },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
+    userName: {
+      type: String,
+      trim: true,
+    },
+    vehicleType: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    photos: [
+      {
+        public_id: String,
+        url: String,
+        width: Number,
+        height: Number,
+        bytes: Number,
+        created_at: String
+      }
+    ],
     rating: {
       type: Number,
+      required: true,
       min: 1,
       max: 5,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+    description: {
+      type: String,
+      trim: true,
     },
-    house: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'House',
-      required: [true, 'Review must belong to a house.'],
-    },
-    userId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'User',
-      required: [true, 'Review must belong to a user'],
-    },
-    photo: { type: String }, // URL or path to image
-    tags: [String], // e.g., #EngineRepair, #OilChange
-    garageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Garage' },
-    location: {
-      type: { type: String, default: 'Point' },
-      coordinates: { type: [Number], required: true }, // [longitude, latitude]
-    },
-  },
-  {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    tags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
   },
   { timestamps: true }
 );
 
 reviewSchema.index({ location: '2dsphere' });
-// QUERY MIDDLEWARE
-reviewSchema.pre(/^find/, function (next) {
-  //child populate - house !required
-  this.populate({
-    path: 'user',
-    select: 'name photo',
-  });
-  next();
-});
 
 const Review = mongoose.model('Review', reviewSchema);
 module.exports = Review;
