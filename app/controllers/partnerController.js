@@ -194,19 +194,19 @@ exports.getServicesCatalog = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.updatePartnerServices = catchAsync(async (req, res, next) => {
-  const partner = await Partner.findByIdAndUpdate(
-    req.user.id,
-    { services: req.body.serviceIds },
-    { new: true, runValidators: true }
-  );
+// exports.updatePartnerServices = catchAsync(async (req, res, next) => {
+//   const partner = await Partner.findByIdAndUpdate(
+//     req.user.id,
+//     { services: req.body.serviceIds },
+//     { new: true, runValidators: true }
+//   );
 
-  res.status(200).json({
-    success: true,
-    message: 'Services updated successfully',
-    data: { partner }
-  });
-});
+//   res.status(200).json({
+//     success: true,
+//     message: 'Services updated successfully',
+//     data: { partner }
+//   });
+// });
 
 exports.getBrandsCatalog = catchAsync(async (req, res, next) => {
   const brands = await Brand.find({ active: true });
@@ -1005,3 +1005,37 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
   }
 });
 
+exports.updatePartnerServices = async (req, res) => {
+  try {
+    const partnerId = req.user.id; // from JWT middleware
+    const { categoryName, serviceName, selected } = req.body;
+
+    if (!categoryName || !serviceName) {
+      return res.status(400).json({ message: "categoryName and serviceName are required" });
+    }
+
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ message: "Partner not found" });
+    }
+
+    const category = partner.services.find(c => c.categoryName === categoryName);
+    if (!category) return res.status(404).json({ message: "Category not found" });
+
+    const service = category.subServices.find(s => s.name === serviceName);
+    if (!service) return res.status(404).json({ message: "Sub service not found" });
+
+    service.selected = selected; // true or false
+
+    await partner.save();
+
+    res.status(200).json({
+      message: `Service updated successfully`,
+      services: partner.services
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};

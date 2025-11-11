@@ -74,6 +74,8 @@ router.patch('/updatePartnerBrands', protect, validateBrandSelection, partnerCon
 router.patch('/uploadShopPhotos', upload.array('photos', 4), protect, partnerController.uploadShopPhotos);
 router.get('/check-limit', protect, restrictTo('partner'), partnerController.checkBrandLimit);
 router.get('/my-brands', protect, restrictTo('partner'), partnerController.getPartnerBrands);
+router.patch('/updatePartnerServices', protect, partnerController.updatePartnerServices);
+
 
 // ===== General routes =====
 router.post('/', partnerController.createPartner);
