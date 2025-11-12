@@ -25,6 +25,7 @@ const partnerRouter = require('./app/routes/partnerRoutes');
 const otpRouter = require('./app/routes/otpRoutes');
 const authRouter = require('./app/routes/authRoutes');
 const quickReviewRouter = require('./app/routes/quickReviewRoutes');
+const leadsRouter = require('./app/routes/leadRoutes');
 
 
 
@@ -89,6 +90,7 @@ app.use('/api/partners', partnerRouter);
 app.use('/api/otps', otpRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/quickReviews', quickReviewRouter);
+app.use('/api/leads', leadsRouter);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'success', message: 'Server is healthy 🚀' });

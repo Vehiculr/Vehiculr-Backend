@@ -46,20 +46,20 @@ exports.generateQRImage = async (qrData, options = {}) => {
 // Generate PUBLIC URL that anyone can access
 exports.generatePublicQRUrl = (partner) => {
   const garageId = partner.garageId || `GAR${partner._id.toString().slice(-5)}`;
-  return `http://localhost:3000/reviewPage`;
+  return `http://localhost:3000/reviewPage/${garageId}`;
 };
 
 // Generate SHORT readable URL for QR
 exports.generateShortQRUrl = (partner) => {
   const baseUrl = process.env.FRONTEND_URL || 'https://yourapp.com';
-  return `${baseUrl}/garage/${partner.garageId || `GAR${partner._id.toString().slice(-5)}`}`;
+  return `http://localhost:3000/reviewPage/${partner.garageId || `GAR${partner._id.toString().slice(-5)}`}`;
 };
 
 
 // Generate short display URL (for showing to users)
 exports.generateDisplayUrl = (partner) => {
   const garageId = partner.garageId || `GAR${partner._id.toString().slice(-5)}`;
-  return `${BASE_URL}/garage/${garageId}`;
+  return `http://localhost:3000/reviewPage/${garageId}`;
 };
 
 // Generate QR code with short URL (for normal scanners)

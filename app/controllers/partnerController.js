@@ -22,6 +22,7 @@ const {
 } = require('../utils/qrGenerator');
 const path = require('path');
 const fs = require('fs');
+const servicesMaster = require('../services/partnerMasterServices');
 // const { generateQRCode } = require('../utils/qrGenerator');
 // const { sendWhatsAppOTP } = require('../utils/notificationService');
 // const Service = require('../models/serviceModel');
@@ -134,7 +135,7 @@ exports.getPartnerProfile = catchAsync(async (req, res, next) => {
 
 // Update partner profile
 exports.updatePartnerProfile = catchAsync(async (req, res, next) => {
-  const allowedFields = ['fullName', 'businessName', 'shopLocation', 'expertise', 'description'];
+  const allowedFields = ['fullName', 'businessName', 'shopLocation', 'expertise', 'description','bio'];
   const filteredBody = {};
   Object.keys(req.body).forEach(key => {
     if (allowedFields.includes(key)) {
@@ -1037,5 +1038,23 @@ exports.updatePartnerServices = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+
+// GET all partners
+exports.getAllServices = async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: "Master services fetched successfully",
+      data: servicesMaster
+    });
+  } catch (error) {
+    console.error("Error fetching master services:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
   }
 };

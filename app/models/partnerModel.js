@@ -114,7 +114,7 @@ const partnerSchema = new mongoose.Schema({
   },
   expertise: {
     type: [String],
-    enum: ['Off-Roads', 'Vintages', 'Luxury Automobile'],
+    enum: [],
     default: []
   },
   kyc: kycSchema,
@@ -136,7 +136,10 @@ const partnerSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-
+  bio: {
+    type: String,
+    trim: true,   // Kindly add a brief description about your garage and it’s expertise.
+  },
   maxFreeBrands: {
     type: Number,
     default: 50   // brand limit befeoreIncreased limit for free accounts
