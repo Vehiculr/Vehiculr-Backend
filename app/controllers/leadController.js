@@ -1,11 +1,96 @@
 const Lead = require("../models/leadModel");
-const axios = require("axios"); 
+const axios = require("axios");
+const User = require('../models/userModel');
+const Partner = require('../models/partnerModel');
+const sendEmail = require('../utils/email');
+const { sendOTP } = require('../services/twilioClient');
+const { generateOTP } = require('../utils/generateOTP');
 const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
 
+
+exports.requestQuoteOTP = async (req, res) => {
+  try {
+    const { userPhone } = req.body;
+    if (!userPhone) return res.status(400).json({ message: "userPhone number is required" });
+
+    // Check existing accounts only
+    const [foundUser, foundPartner] = await Promise.all([
+      Lead.findOne({ userPhone })
+    ]);
+console.log("Found User:", foundUser);  
+    const account = foundUser || foundPartner;
+    if (!account) {
+      return res.status(404).json({
+        message: "userPhone number is not registered with any user or partner"
+      });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 5 * 60000); // 5 min
+
+    account.quoteOtp = otp;
+    account.quoteOtpExpires = otpExpires;
+    await account.save();
+
+    await sendOTP(userPhone, otp);
+
+    res.status(200).json({
+      message: "OTP sent successfully for quote verification",
+      ...(process.env.NODE_ENV !== 'production' && {
+        otp,
+        expiresIn: "5 minutes"
+      })
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+exports.verifyQuoteOTP = async (req, res) => {
+  try {
+    const { userPhone, otp } = req.body;
+    if (!userPhone || !otp) {
+      return res.status(400).json({ message: "Phone and OTP are required" });
+    }
+
+    const [foundUser, foundPartner] = await Promise.all([
+      Lead.findOne({ userPhone })
+    ]);
+
+    const account = foundUser || foundPartner;
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+    console.log("Verifying OTP for account:", account);
+
+    const isValid =
+      account.quoteOtp === otp && account.quoteOtpExpires > Date.now();
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Clear OTP
+    account.quoteOtp = undefined;
+    account.quoteOtpExpires = undefined;
+    await account.save();
+
+    // No token, no new user creation
+    res.status(200).json({
+      message: "OTP verified successfully",
+      accountId: account._id,
+      accountType: foundUser ? "user" : "partner"
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
 // ✅ 1. Create new lead
 exports.createLead = async (req, res) => {
-    console.log("Create Lead Request Received");
   try {
     const {
       userName,

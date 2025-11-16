@@ -55,4 +55,7 @@ router.patch("/:leadId/sendQuoteReply", leadController.sendQuoteReply);
 // Update lead status
 router.patch("/:leadId/status", leadController.updateLeadStatus);
 
+router.post('/send-quote-otp', leadController.requestQuoteOTP); 
+router.post('/verify-quote-otp', leadController.verifyQuoteOTP);
+
 module.exports = router;

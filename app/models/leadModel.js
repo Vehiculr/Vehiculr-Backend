@@ -32,6 +32,8 @@ const leadSchema = new mongoose.Schema({
         estimatedCompletionTime: String,
         sentAt: Date
     },
+    quoteOtp: String,
+    quoteOtpExpires: Date,
 
     createdAt: { type: Date, default: Date.now }
 });
