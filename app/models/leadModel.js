@@ -3,8 +3,11 @@ const mongoose = require("mongoose");
 const leadSchema = new mongoose.Schema({
     userName: { type: String, required: true },
     userPhone: { type: String, required: true },
-    vehicle: String,
-    services: [String],
+    vehicle: { type: String, required: true },
+    services: {
+        type: [String],   // Example: ["Oil Change", "Brake Pad Replacement"]
+        required: true
+    },
     location: String,
     pickupDrop: { type: Boolean, default: false },
     notes: String,
@@ -19,7 +22,8 @@ const leadSchema = new mongoose.Schema({
             created_at: String
         }
     ],
-    garageId: { type: String, required: true },
+    garageId: { type: String, required: true },   // GAROD10D (custom garageId)
+    partnerId: { type: mongoose.Schema.Types.ObjectId, ref: "Partner" },  // OPTIONAL but useful
     status: {
         type: String,
         enum: ["new", "quoted", "in_progress", "completed", "cancelled"],
@@ -35,6 +39,13 @@ const leadSchema = new mongoose.Schema({
     quoteOtp: String,
     quoteOtpExpires: Date,
 
+    whatsappLogs: {
+        userMessage: String,
+        partnerMessage: String,
+        sentToUserAt: Date,
+        sentToPartnerAt: Date,
+        deliveryStatus: { type: String, default: "pending" }
+    },
     createdAt: { type: Date, default: Date.now }
 });
 

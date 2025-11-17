@@ -7,6 +7,7 @@ const { sendOTP } = require('../services/twilioClient');
 const { generateOTP } = require('../utils/generateOTP');
 const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
+const { sendWhatsAppMessage } = require("../services/twilioClient"); // Import Twilio utility
 
 
 exports.requestQuoteOTP = async (req, res) => {
@@ -18,7 +19,6 @@ exports.requestQuoteOTP = async (req, res) => {
     const [foundUser, foundPartner] = await Promise.all([
       Lead.findOne({ userPhone })
     ]);
-console.log("Found User:", foundUser);  
     const account = foundUser || foundPartner;
     if (!account) {
       return res.status(404).json({
@@ -271,7 +271,7 @@ exports.updateLeadStatus = async (req, res) => {
 };
 
 // 🟢 WhatsApp sender (dummy version)
-async function sendWhatsAppMessage(phone, message) {
+async function sendWhatsAppMessage2(phone, message) {
   try {
     // Use your WhatsApp API provider here (Green API, Twilio, Meta Cloud API, etc.)
     console.log(`Sending WhatsApp message to ${phone}: ${message}`);
@@ -281,3 +281,348 @@ async function sendWhatsAppMessage(phone, message) {
     console.error("WhatsApp message failed:", err.message);
   }
 }
+
+// controllers/leadController.js
+exports.createLeadAndNotify = async (req, res) => {
+  try {
+    const garageId = req.params.garageId;
+
+    const {
+      userName,
+      userPhone,
+      vehicle,
+      services,
+      location,
+      pickupDrop,
+      notes,
+      budget
+    } = req.body;
+
+    // --------------------------------------
+    // 1) UPLOAD PHOTOS
+    // --------------------------------------
+    let leadPhotos = [];
+
+    if (req.files && req.files.length > 0) {
+      if (req.files.length > 4) {
+        return res.status(400).json({
+          success: false,
+          message: "Maximum 4 photos allowed."
+        });
+      }
+
+      const uploadResults = await uploadMultipleToCloudinary(req.files, {
+        folder: 'lead-photos',
+        transformation: [{ width: 1200, height: 900, crop: "limit" }]
+      });
+
+      leadPhotos = uploadResults.map(p => ({
+        public_id: p.public_id,
+        url: p.url,
+        format: p.format,
+        width: p.width,
+        height: p.height,
+        bytes: p.bytes,
+        created_at: p.created_at,
+      }));
+    }
+
+    // --------------------------------------
+    // 2) SAVE LEAD IN DB
+    // --------------------------------------
+    const lead = await Lead.create({
+      userName,
+      userPhone,
+      vehicle,
+      services: JSON.parse(services),
+      location,
+      pickupDrop,
+      notes,
+      budget,
+      photos: leadPhotos,
+      garageId,
+      status: "new"
+    });
+    // --------------------------------------
+    // 3) SEND WHATSAPP TO GARAGE OWNER
+    // --------------------------------------
+    const partner = await Partner.findOne({ garageId: garageId });
+
+    if (!partner)
+      return res.status(404).json({ success: false, message: "Garage not found" });
+
+    const ownerPhone = partner.phone;
+    if (!ownerPhone)
+      return res.status(400).json({ success: false, message: "Garage owner has no WhatsApp number." });
+
+    const enquiryMessage = `
+🚗 *New Quotation Request on Garages of India!*
+
+Hey *${partner.businessName}* 👋,
+
+A customer has requested a quote.
+
+📌 *Name:* ${userName}
+📞 *Phone:* ${userPhone}
+🚘 *Vehicle:* ${vehicle}
+🛠 *Services:* ${JSON.parse(services).join(", ")}
+💰 *Budget:* ₹${budget}
+📍 *Location:* ${location}
+
+Please respond with a quotation ASAP.
+– *Garages of India Team*
+    `;
+
+    const userMessage = `
+Hey *${userName}* 👋,
+
+Your quote request has been sent to *${partner.businessName}*.
+
+They will contact you shortly on *${userPhone}*.
+
+Thanks for using *Garages of India* 🚗✨
+    `;
+
+    // Send to Garage
+    await sendWhatsAppMessage(ownerPhone, enquiryMessage);
+
+    // Send to User
+    await sendWhatsAppMessage(userPhone, userMessage);
+
+    // --------------------------------------
+    // 4) SAVE LOGS
+    // --------------------------------------
+    lead.whatsappLogs = {
+      partnerMessage: enquiryMessage,
+      userMessage: userMessage,
+      sentToPartnerAt: new Date(),
+      sentToUserAt: new Date(),
+      deliveryStatus: "sent"
+    };
+
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Lead created & WhatsApp notifications sent!",
+      data: lead
+    });
+
+  } catch (error) {
+    console.error("Lead creation failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+};
+
+exports.partnerSendQuote = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { amount, message, estimatedCompletionTime } = req.body;
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found"
+      });
+    }
+
+    // ------------------------------------------------
+    // 1) Generate OTP
+    // ------------------------------------------------
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    lead.partnerQuote = {
+      amount,
+      message,
+      estimatedCompletionTime,
+      sentAt: new Date()
+    };
+
+    lead.quoteOtp = otp;
+    lead.quoteOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    await lead.save();
+
+    // ------------------------------------------------
+    // 2) Send WhatsApp OTP to User
+    // ------------------------------------------------
+    const otpMsg = `
+🔐 *Verify Garage Quote*
+
+Hey *${lead.userName}*,  
+The garage has shared a quote for your request.
+
+💰 *Amount:* ₹${amount}  
+📝 *Message:* ${message}  
+⏱ *Est. Time:* ${estimatedCompletionTime}
+
+Please enter this OTP to verify and confirm the quote:
+
+👉 *${otp}*
+
+*Valid for 10 minutes.*
+    `;
+
+    await sendWhatsAppMessage(lead.userPhone, otpMsg);
+
+    res.status(200).json({
+      success: true,
+      message: "Quote sent & OTP delivered to user",
+      data: {
+        leadId: lead._id,
+        amount,
+        message,
+        estimatedCompletionTime
+      }
+    });
+
+  } catch (error) {
+    console.error("Send Quote Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send quote",
+      error: error.message
+    });
+  }
+};
+
+exports.verifyQuoteOtp = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { otp } = req.body;
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found"
+      });
+    }
+
+    // -----------------------------------------
+    // 1) Validate OTP
+    // -----------------------------------------
+    if (!lead.quoteOtp || !lead.quoteOtpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "No OTP found for this lead"
+      });
+    }
+
+    if (Date.now() > lead.quoteOtpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired"
+      });
+    }
+
+    if (lead.quoteOtp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Incorrect OTP"
+      });
+    }
+
+    // -----------------------------------------
+    // 2) Update Lead Status → quoted
+    // -----------------------------------------
+    lead.status = "quoted";
+
+    // Clear OTP for safety
+    lead.quoteOtp = undefined;
+    lead.quoteOtpExpires = undefined;
+
+    await lead.save();
+
+    // -----------------------------------------
+    // 3) Notify Garage Owner (Optional)
+    // -----------------------------------------
+    const notifyMsg = `
+💬 *Quote Verified by Customer!*
+
+Customer *${lead.userName}* has accepted your quote.
+
+💰 *Amount:* ₹${lead.partnerQuote?.amount}
+📝 *Message:* ${lead.partnerQuote?.message}
+
+You may now proceed with the service.
+`;
+
+    if (lead.userPhone) {
+      await sendWhatsAppMessage(lead.userPhone, "Your quote has been successfully verified. ✔");
+    }
+
+    // (Optional) Send message to partner later when partner phone is available
+
+    // -----------------------------------------
+    // 4) Response
+    // -----------------------------------------
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully. Lead status updated to 'quoted'.",
+      data: lead
+    });
+
+  } catch (error) {
+    console.error("Verify OTP Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify OTP",
+      error: error.message
+    });
+  }
+};
+
+exports.updateLeadStatus = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { status } = req.body;
+
+    // Allowed statuses
+    const allowedStatuses = [
+      "new",
+      "quoted",
+      "in_progress",
+      "completed",
+      "cancelled"
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Allowed: ${allowedStatuses.join(", ")}`
+      });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found"
+      });
+    }
+
+    // Update status
+    lead.status = status;
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Lead status updated to '${status}' successfully`,
+      data: lead
+    });
+
+  } catch (error) {
+    console.error("Lead Status Update Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update lead status",
+      error: error.message
+    });
+  }
+};

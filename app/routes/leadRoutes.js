@@ -41,7 +41,7 @@ router.use((req, res, next) => {
 // router.use(authController.protect);
 
 // User sends quote
-router.post("/createLead", upload.array('photos', 4), leadController.createLead);
+router.post("/createLeadAndNotify/:garageId", upload.array('photos', 4), leadController.createLeadAndNotify);
 
 // Partner gets all leads
 router.get("/:garageId", leadController.getLeadsByPartner);
@@ -57,5 +57,9 @@ router.patch("/:leadId/status", leadController.updateLeadStatus);
 
 router.post('/send-quote-otp', leadController.requestQuoteOTP); 
 router.post('/verify-quote-otp', leadController.verifyQuoteOTP);
+
+router.post("/send-quote-to-user/:leadId", leadController.partnerSendQuote);
+router.post("/verify-quote-otp/:leadId", leadController.verifyQuoteOtp);
+router.patch("/leads/:leadId/status", leadController.updateLeadStatus);
 
 module.exports = router;
