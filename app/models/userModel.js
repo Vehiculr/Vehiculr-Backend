@@ -192,14 +192,14 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Topic'
   }],
-   vehicles: {
+  vehicles: {
     rides: [{
-      type: String, 
+      type: String,
       trim: true,
       maxlength: 50
     }],
     drives: [{
-      type: String, 
+      type: String,
       trim: true,
       maxlength: 50
     }]
@@ -212,9 +212,28 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
-}, {
-  timestamps: true
-});
+  refreshTokens: [
+    {
+      token: String,
+      deviceInfo: {
+        deviceId: String,
+        deviceType: String,
+        userAgent: String,
+        ip: String
+      },
+      createdAt: { type: Date, default: Date.now },
+    }
+  ],
+  googleId: { type: String, index: true, unique: false }, // unique optional across both models
+  role: { type: String, enum: ['user', 'partner', 'admin'], default: 'user' },
+
+  // Also add quoteOtp fields if not already:
+  quoteOtp: String,
+  quoteOtpExpires: Date,
+},
+  {
+    timestamps: true
+  });
 
 // OTP Schema for phone verification
 const otpSchema = new mongoose.Schema({

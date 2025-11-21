@@ -3,18 +3,26 @@ const mongoose = require('mongoose');
 const kycSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['Aadhar', 'PAN', 'DrivingLicense'],
+    enum: ['Aadhar'],
     required: true
   },
-  fullName: {
-    type: String,
-  },
-  documentNumber: {
-    type: String,
-  },
-  address: {
-    type: String,
-  },
+
+  // From Cashfree OKYC Verify API
+  fullName: String,
+  dob: String,
+  gender: String,
+  fatherName: String,
+  address: String,
+  photo: String,
+
+  // Aadhaar info
+  aadhaarMasked: String,   // XXXX-XXXX-1234
+  aadhaarLast4: String,    // 1234
+
+  // Cashfree OKYC
+  refId: String,           
+  rawVerifyResponse: Object,
+
   verified: {
     type: Boolean,
     default: false
@@ -100,6 +108,7 @@ const partnerSchema = new mongoose.Schema({
   email: {
     type: String
   },
+  picture: String,
   vehicleTypes: {
     type: [String],
     enum: ["Car", "Bike"],
@@ -168,6 +177,25 @@ const partnerSchema = new mongoose.Schema({
       default: Date.now
     }
   },
+  refreshTokens: [
+    {
+      token: String,
+      deviceInfo: {
+        deviceId: String,
+        deviceType: String,
+        userAgent: String,
+        ip: String
+      },
+      createdAt: { type: Date, default: Date.now },
+    }
+  ],
+  googleId: { type: String, index: true, unique: false }, // unique optional across both models
+  role: { type: String, enum: ['user', 'partner', 'admin'], default: 'user' },
+  isVerified: { type: Boolean, default: false },
+
+  // Also add quoteOtp fields if not already:
+  quoteOtp: String,
+  quoteOtpExpires: Date,
 
 }, { timestamps: true });
 

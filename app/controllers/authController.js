@@ -13,6 +13,10 @@ const { sendOTP } = require('../services/twilioClient');
 const { generateOTP } = require('../utils/generateOTP');
 const { sendWhatsAppMessage } = require('../services/twilioClient');
 require("dotenv").config();
+const { OAuth2Client } = require("google-auth-library");
+const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/tokenUtils');
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
@@ -138,13 +142,255 @@ exports.login = catchAsync(async (req, res, next) => {
   createSendToken(account, 200, res);
 });
 
-exports.logout = (req, res) => {
-  res.cookie('jwt', 'loggedout', {
-    expires: new Date(Date.now() + 10 * 24 * 1000 * 60),
-    httpOnly: true,
-  });
-  res.status(200).json({ status: 'success' });
+// ---------------------------
+// GOOGLE LOGIN
+// ---------------------------
+
+// Helper: save refresh token (on account)
+async function saveRefreshToken(account, token, deviceInfo = {}) {
+  account.refreshTokens = account.refreshTokens || [];
+  account.refreshTokens.push({ token, deviceInfo });
+  await account.save();
+}
+
+// Helper: remove refresh token
+async function removeRefreshToken(account, token) {
+  account.refreshTokens = (account.refreshTokens || []).filter(rt => rt.token !== token);
+  await account.save();
+}
+
+// Unified login route - supports { type: 'google'|'otp-login', accountType: 'user'|'partner', ... }
+exports.loginwithType = async (req, res) => {
+  try {
+    const { type, accountType } = req.body;
+
+    if (type === 'google') {
+      return await exports.googleLogin(req, res);
+    }
+
+    if (type === 'otp-login') {
+      // delegate to existing OTP verification that DOES NOT create users/partners
+      // assume you have verifyQuoteOTP-like function that just validates and returns account
+      return await exports.verifyQuoteOTPForLogin(req, res);
+    }
+
+    return res.status(400).json({ message: 'Invalid login type' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 };
+
+// Google login (supports accountType in body)
+exports.googleLogin = async (req, res) => {
+  try {
+    const { token: idToken, accountType = 'user', deviceInfo = {} } = req.body;
+    if (!idToken) return res.status(400).json({ message: 'Google token required' });
+
+    const ticket = await client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name: fullName, picture } = payload;
+
+    let foundUser = await User.findOne({ googleId });
+    let foundPartner = await Partner.findOne({ googleId });
+    let account = foundUser || foundPartner;
+    let detectedType = foundUser ? 'user' : foundPartner ? 'partner' : accountType;
+
+    if (!account) {
+      if (accountType === 'partner') {
+        account = await Partner.create({
+          googleId,
+          email,
+          fullName,
+          picture,
+          isVerified: true,
+          role: 'partner'
+        });
+      } else {
+        account = await User.create({
+          googleId,
+          email,
+          fullName,
+          picture,
+          isVerified: true,
+          role: 'user'
+        });
+      }
+    }
+
+    // issue tokens
+    const accessToken = signAccessToken({ id: account._id, accountType: detectedType });
+    const refreshToken = signRefreshToken({ id: account._id, accountType: detectedType });
+
+    // save refresh token with device info
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const ua = req.get('User-Agent') || '';
+    const di = {
+      ...deviceInfo,
+      ip,
+      userAgent: ua
+    };
+    await saveRefreshToken(account, refreshToken, di);
+
+    // Optionally set httpOnly cookie for refresh token (safer)
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    return res.json({
+      success: true,
+      message: 'Google login successful',
+      accessToken,
+      refreshToken,
+      accountType: detectedType,
+      redirectTo: process.env.FRONTEND_URL // frontend can redirect or use route
+    });
+
+  } catch (error) {
+    console.error('Google Login Error:', error);
+    return res.status(500).json({ success: false, message: 'Google login failed', error: error.message });
+  }
+};
+
+// Example verifyQuoteOTPForLogin (OTP-only flow for existing accounts, no creation, no tokens until verified)
+exports.verifyQuoteOTPForLogin = async (req, res) => {
+  try {
+    const { phone, otp, deviceInfo = {} } = req.body;
+    if (!phone || !otp) return res.status(400).json({ message: 'Phone and otp required' });
+
+    // find account in both collections
+    const [user, partner] = await Promise.all([
+      User.findOne({ phone }),
+      Partner.findOne({ phone })
+    ]);
+    const account = user || partner;
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+
+    const valid = account.quoteOtp === otp && account.quoteOtpExpires && account.quoteOtpExpires > Date.now();
+    if (!valid) return res.status(400).json({ message: 'Invalid or expired OTP' });
+
+    // clear used OTP
+    account.quoteOtp = undefined;
+    account.quoteOtpExpires = undefined;
+    await account.save();
+
+    // issue tokens (same as above)
+    const detectedType = user ? 'user' : 'partner';
+    const accessToken = signAccessToken({ id: account._id, accountType: detectedType });
+    const refreshToken = signRefreshToken({ id: account._id, accountType: detectedType });
+
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const ua = req.get('User-Agent') || '';
+    await saveRefreshToken(account, refreshToken, { ...deviceInfo, ip, userAgent: ua });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    return res.json({ success: true, accessToken, refreshToken, accountType: detectedType });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// Refresh token endpoint
+exports.refresh = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken || req.body.refreshToken;
+    if (!token) return res.status(401).json({ message: 'No refresh token' });
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(token);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    const { id: accountId, accountType } = payload;
+
+    // Find account in relevant collection
+    const account = (accountType === 'partner')
+      ? await Partner.findById(accountId)
+      : await User.findById(accountId);
+
+    if (!account) return res.status(401).json({ message: 'Account not found' });
+
+    // check token saved on account
+    const hasToken = account.refreshTokens && account.refreshTokens.some(rt => rt.token === token);
+    if (!hasToken) return res.status(401).json({ message: 'Refresh token revoked' });
+
+    // Issue new tokens
+    const accessToken = signAccessToken({ id: account._id, accountType });
+    const refreshToken = signRefreshToken({ id: account._id, accountType });
+
+    // replace stored token (simple approach: remove old, add new)
+    await removeRefreshToken(account, token);
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const ua = req.get('User-Agent') || '';
+    await saveRefreshToken(account, refreshToken, { ip, userAgent: ua });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 30*24*60*60*1000
+    });
+
+    return res.json({ success: true, accessToken, refreshToken });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Logout / revoke refresh token
+exports.logout = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken || req.body.refreshToken;
+    if (!token) return res.status(204).send();
+
+    // verify cookie to get account id
+    let payload;
+    try {
+      payload = verifyRefreshToken(token);
+    } catch (err) {
+      res.clearCookie('refreshToken');
+      return res.status(200).json({ success: true });
+    }
+
+    const { id: accountId, accountType } = payload;
+    const account = accountType === 'partner' ? await Partner.findById(accountId) : await User.findById(accountId);
+    if (account) {
+      await removeRefreshToken(account, token);
+    }
+
+    res.clearCookie('refreshToken');
+    return res.json({ success: true, message: 'Logged out' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+
+// exports.logout = (req, res) => {
+//   res.cookie('jwt', 'loggedout', {
+//     expires: new Date(Date.now() + 10 * 24 * 1000 * 60),
+//     httpOnly: true,
+//   });
+//   res.status(200).json({ status: 'success' });
+// };
 
 exports.protect = catchAsync(async (req, res, next) => {
   // 1) Getting token from headers
@@ -507,6 +753,7 @@ exports.verifyOTP = async (req, res) => {
 
     // ✅ OTP is valid → mark account as verified
     account.isVerified = true;
+    account.isPhoneVerified = true
     account.otp = undefined;        // clear OTP after use
     account.otpExpires = undefined; // clear expiry
     // ✅ If account is Partner → Initialize default Services only if not already set

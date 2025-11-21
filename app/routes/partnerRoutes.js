@@ -8,6 +8,7 @@ const multer = require('multer');
 const publicQrController = require('../controllers/publicQrController');
 const { validateBrandSelection } = require('../valiations/brandValidation');
 const { validateOTPRequest, validateOTPVerification } = require('../valiations/partnerValidation');
+const { googleLogin } = require("../controllers/authController");
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -62,6 +63,7 @@ router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 // ===== Auth routes =====
 router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
 router.post('/verify-otp', otpLimiter, validateOTPVerification, authController.verifyOTP);
+router.post("/google", authController.googleLogin);
 // router.post('/login', authController.loginWithEmailPassword);
 
 // ===== Protected partner routes =====
