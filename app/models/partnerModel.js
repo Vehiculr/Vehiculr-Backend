@@ -221,4 +221,5 @@ partnerSchema.pre('save', function (next) {
 });
 partnerSchema.index({ shopLocation: '2dsphere' });
 
-module.exports = mongoose.model('Partner', partnerSchema);
+const Partner = mongoose.model('Partner', partnerSchema);
+module.exports = Partner;

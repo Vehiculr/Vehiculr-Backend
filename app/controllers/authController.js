@@ -630,56 +630,47 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
 
 exports.requestOTP = async (req, res) => {
   try {
-    const { phone, accountType = 'user' } = req.body; // Default to 'user'
-    if (!phone) return res.status(400).json({ message: "Phone number is required" });
+    const { phone, accountType = 'user' } = req.body;
 
-    let account;
-    let detectedAccountType;
+    if (!phone) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
 
-    // Check both collections
+    // Check if number exists under any type
     const [foundUser, foundPartner] = await Promise.all([
       User.findOne({ phone }),
       Partner.findOne({ phone })
     ]);
 
-    // If requesting partner and partner exists, use partner
-    if (accountType === 'partner' && foundPartner) {
-      account = foundPartner;
-      detectedAccountType = 'partner';
-    }
-    // If requesting user and user exists, use user
-    else if (accountType === 'user' && foundUser) {
-      account = foundUser;
-      detectedAccountType = 'user';
-    }
-    // If account exists but not the requested type, return error
-    else if ((accountType === 'partner' && foundUser) || (accountType === 'user' && foundPartner)) {
+    // If phone already used by opposite type → BLOCK
+    if (foundUser && accountType === 'partner') {
       return res.status(400).json({
-        message: `Phone number already registered as ${foundUser ? 'user' : 'partner'}`,
-        existingAccountType: foundUser ? 'user' : 'partner',
-        suggestion: 'Use a different phone number or contact support'
+        message: "This number is already registered as a USER",
+        existingAccountType: "user"
       });
     }
-    // No account exists, create new based on requested type
-    else {
-      if (accountType === 'partner') {
-        account = await Partner.create({ phone });
-        detectedAccountType = 'partner';
-      } else {
-        account = await User.create({ phone });
-        detectedAccountType = 'user';
-      }
+
+    if (foundPartner && accountType === 'user') {
+      return res.status(400).json({
+        message: "This number is already registered as a PARTNER",
+        existingAccountType: "partner"
+      });
     }
 
+    // OTP Generation
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
 
-    // Update OTP details
-    account.otp = otp;
-    account.otpExpires = otpExpires;
-    await account.save();
+    // Save OTP in temp storage (only user or partner if exists)
+    let account = foundUser || foundPartner;
 
-    // Send OTP based on environment
+    if (account) {
+      account.otp = otp;
+      account.otpExpires = otpExpires;
+      await account.save();
+    }
+
+    // Send SMS via your Twilio function
     const otpResponse = await sendOTP(phone, otp);
 
     if (!otpResponse.success) {
@@ -689,20 +680,15 @@ exports.requestOTP = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "OTP sent successfully",
-      mode: isProduction() ? 'production' : 'development',
-      accountType: detectedAccountType,
-      // Include OTP in development for testing
-      ...(!isProduction() && {
-        otp: otp,
-        expiresIn: `${process.env.OTP_EXPIRY || 10} minutes`,
-        accountId: account._id
-      })
+      accountExists: !!account,
+      ...(isProduction() ? {} : { otp })   // show OTP only in dev
     });
+
   } catch (error) {
     console.error("OTP request error:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -710,88 +696,67 @@ exports.requestOTP = async (req, res) => {
 exports.verifyOTP = async (req, res) => {
   try {
     const { phone, otp } = req.body;
-    if (!phone || !otp) {
+
+    if (!phone || !otp ) {
       return res.status(400).json({ message: "Phone and OTP are required" });
     }
 
-    // Check both User and Partner collections
-    const [foundUser, foundPartner] = await Promise.all([
-      User.findOne({ phone }),
-      Partner.findOne({ phone })
-    ]);
+    let account = await User.findOne({ phone }) || await Partner.findOne({ phone });
+    let accountType = req.body.accountType || (account instanceof Partner ? 'partner' : 'user');
 
-    const account = foundUser || foundPartner;
-    if (!account) {
-      return res.status(404).json({ message: "Account not found" });
-    }
+    // If account does NOT exist → create AFTER OTP validation
+    const creatingNew = !account;
 
-    const accountType = foundUser ? 'user' : 'partner';
-
-    // In development, allow using the default test OTP regardless of what's stored
-    let isValidOTP = false;
-
-    if (isProduction()) {
-      // Production: Strict OTP validation
-      isValidOTP = account.otp === otp && account.otpExpires > Date.now();
-    } else {
-      // Development: Allow test OTP or actual stored OTP
-      const testOTP = process.env.DEFAULT_OTP || '12345';
-      isValidOTP = (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
-
-      if (otp === testOTP) {
-        console.log('✅ Development mode: Using test OTP');
-      }
-    }
-
-    if (!isValidOTP) {
+    // If account exists but different type → block
+    if (account && account.accountType !== accountType) {
       return res.status(400).json({
-        message: "Invalid or expired OTP",
-        hint: isProduction() ? undefined : `Try using: ${process.env.DEFAULT_OTP || '12345'}`,
-        accountType: accountType
+        message: `This number is registered as ${account.accountType}`
       });
     }
 
-    // ✅ OTP is valid → mark account as verified
-    account.isVerified = true;
-    account.isPhoneVerified = true
-    account.otp = undefined;        // clear OTP after use
-    account.otpExpires = undefined; // clear expiry
-    // ✅ If account is Partner → Initialize default Services only if not already set
-    if (accountType === 'partner' && (!account.services || account.services.length === 0)) {
-      account.services = masterServices;
-      console.log("✅ Default services assigned to partner:", account.phone);
+    // Validate OTP
+    const testOTP = process.env.DEFAULT_OTP || "12345";
+    const isValidOTP = isProduction()
+      ? account && account.otp === otp && account.otpExpires > Date.now()
+      : otp === testOTP || (account && account.otp === otp);
+
+    if (!isValidOTP) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
+
+    // OTP valid → create new account if needed
+    if (creatingNew) {
+      if (accountType === "partner") {
+        account = await Partner.create({ phone, isVerified: true });
+      } else {
+        account = await User.create({ phone, isVerified: true });
+      }
+    }
+
+    // Mark verified
+    account.isVerified = true;
+    account.isPhoneVerified = true;
+    account.otp = undefined;
+    account.otpExpires = undefined;
     await account.save();
 
-    // ✅ Generate JWT token with account type in payload
-    const tokenPayload = {
-      id: account._id,
-      phone: account.phone,
-      accountType: accountType,
-      isVerified: true
-    };
-
     const token = jwt.sign(
-      tokenPayload,
+      { id: account._id, phone: account.phone, accountType },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "OTP verified successfully",
       token,
-      accountType: accountType,
       accountId: account._id,
-      mode: isProduction() ? 'production' : 'development',
-      // Include user/partner specific data if needed
-      ...(accountType === 'partner' && { businessName: account.businessName }),
-      ...(accountType === 'user' && { fullName: account.fullName })
+      accountType
     });
   } catch (error) {
     console.error("OTP verification error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server Error",
-      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error"
+      error: error.message
     });
   }
 };

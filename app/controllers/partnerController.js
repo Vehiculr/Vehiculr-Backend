@@ -36,6 +36,28 @@ exports.setUserId = (req, res, next) => {
 // CREATE a new partner
 exports.createPartner = async (req, res) => {
   try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+    const [foundUser, foundPartner] = await Promise.all([
+      User.findOne({ phone }),
+      Partner.findOne({ phone })
+    ]);
+    if (foundPartner) {
+      return res.status(400).json({
+        message: "This number is already registered as a PARTNER",
+        existingAccountType: "partner"
+      });
+    }
+
+    // If phone already used by opposite type → BLOCK
+    if (foundUser) {
+      return res.status(400).json({
+        message: "This number is already registered as a USER",
+        existingAccountType: "user"
+      });
+    }
     const partner = await Partner.create(req.body);
     res.status(201).json({
       status: 'success',
@@ -135,7 +157,7 @@ exports.getPartnerProfile = catchAsync(async (req, res, next) => {
 
 // Update partner profile
 exports.updatePartnerProfile = catchAsync(async (req, res, next) => {
-  const allowedFields = ['fullName', 'businessName', 'shopLocation', 'expertise', 'description','bio'];
+  const allowedFields = ['fullName', 'businessName', 'shopLocation', 'expertise', 'description', 'bio'];
   const filteredBody = {};
   Object.keys(req.body).forEach(key => {
     if (allowedFields.includes(key)) {
