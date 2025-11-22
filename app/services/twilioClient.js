@@ -34,7 +34,6 @@ const sendWhatsAppMessage = async (to, message) => {
 
 
 const sendOTP = async (phone, otp) => {
-  console.log(`your otp for ${phone} , is ${otp}`)
  if (isProduction()) {
     // Use Twilio in production
     try {

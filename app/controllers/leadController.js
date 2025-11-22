@@ -63,8 +63,6 @@ exports.verifyQuoteOTP = async (req, res) => {
     if (!account) {
       return res.status(404).json({ message: "Account not found" });
     }
-    console.log("Verifying OTP for account:", account);
-
     const isValid =
       account.quoteOtp === otp && account.quoteOtpExpires > Date.now();
 
@@ -104,7 +102,7 @@ exports.createLead = async (req, res) => {
       garageId
     } = req.body;
     // Multer stores file info in req.files
-     // ✅ Photo Upload Handling (if images exist)
+    // ✅ Photo Upload Handling (if images exist)
     let leadPhotos = [];
 
     if (req.files && req.files.length > 0) {
@@ -165,9 +163,6 @@ exports.createLead = async (req, res) => {
 exports.getLeadsByPartner = async (req, res) => {
   try {
     const { garageId } = req.params;
-
-    console.log("Fetching leads for garageId:", garageId);
-
     // ✅ Fetch leads that match garageId exactly
     const leads = await Lead.find({
       garageId: { $exists: true, $eq: garageId }

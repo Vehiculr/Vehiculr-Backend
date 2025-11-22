@@ -43,16 +43,12 @@ exports.getGarageByPublicId = catchAsync(async (req, res, next) => {
 // Get garage public profile (HTML page for web browsers)
 exports.getGaragePublicProfile = catchAsync(async (req, res, next) => {
   const { garageId } = req.params;
-
-  console.log("Fetching public profile for garageId:", garageId);
-
   const partner = await Partner.findOne({ 
     $or: [
       { garageId: garageId }
     ]
   }).select('businessName phone address services brands shopLocation shopPhotos.url isPremium garageId');
 
-  console.log("Found partner:", partner);   
   if (!partner) {
     return res.status(404).send('Garage not found');
   }

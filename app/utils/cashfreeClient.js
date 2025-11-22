@@ -17,7 +17,6 @@ exports.initiateOtp = async ({ aadhaarNumber }) => {
   const body = { aadhaar: aadhaarNumber };
 
   const { data } = await axios.post(url, body, { headers: headers() });
-  console.log('======>', data);  
   return data;
 };
 

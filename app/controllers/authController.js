@@ -126,11 +126,11 @@ exports.login = catchAsync(async (req, res, next) => {
   ]);
 
   const account = foundUser || foundPartner;
-  if(foundPartner) {
-    account.accountType = 'partner'; 
+  if (foundPartner) {
+    account.accountType = 'partner';
   }
   else {
-    account.accountType = 'user'; 
+    account.accountType = 'user';
   }
   if (!account) {
     return res.status(404).json({
@@ -341,7 +341,7 @@ exports.refresh = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Lax',
-      maxAge: 30*24*60*60*1000
+      maxAge: 30 * 24 * 60 * 60 * 1000
     });
 
     return res.json({ success: true, accessToken, refreshToken });
@@ -697,7 +697,7 @@ exports.verifyOTP = async (req, res) => {
   try {
     const { phone, otp } = req.body;
 
-    if (!phone || !otp ) {
+    if (!phone || !otp) {
       return res.status(400).json({ message: "Phone and OTP are required" });
     }
 
@@ -764,8 +764,6 @@ exports.verifyOTP = async (req, res) => {
 exports.requestEmailOTP = async (req, res) => {
   try {
     const { email, accountType = 'user' } = req.body;
-    console.log('requestEmailOTP called with:', req.body);
-
     if (!email) {
       return res.status(400).json({
         message: "Email address is required"
@@ -788,7 +786,6 @@ exports.requestEmailOTP = async (req, res) => {
       User.findOne({ email: email.toLowerCase() }),
       Partner.findOne({ email: email.toLowerCase() })
     ]);
-    console.log('requestEmailOTP called with:', foundUser, foundPartner);
 
     // If requesting partner and partner exists, use partner
     if (accountType === 'partner' && foundPartner) {

@@ -74,7 +74,6 @@ exports.updateOne = (Model) =>
     });
 
     if (!doc) {
-      console.log(doc);
       return next(new AppError(`No ${Model} found with that ID`, 404));
     }
     res.status(200).json({
@@ -136,11 +135,9 @@ exports.geocodeCity = (Model) =>
   exports.addReview = (Model) =>
     catchAsync(async (req, res, next) => {
       const { garageId } = req.params;
-      console.log('=====>>', ga)
     const { comment, rating } = req.body;
     const userId = req.user._id;
   
-    console.log('=====>>',garageId, comment, rating )
     const garage = await Model.findById(garageId);
     if (!garage) return res.status(404).send('Garage not found');
   

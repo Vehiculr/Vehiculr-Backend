@@ -291,7 +291,6 @@ exports.submitKYC = catchAsync(async (req, res, next) => {
 
 // Get available brands
 exports.getAvailableBrands = catchAsync(async (req, res, next) => {
-  console.log('Available car brands:');
   res.status(200).json({
     success: true,
     data: {
@@ -304,8 +303,6 @@ exports.getAvailableBrands = catchAsync(async (req, res, next) => {
 // Update partner brands
 exports.updatePartnerBrands = catchAsync(async (req, res, next) => {
   const partner = await Partner.findById(req.user.id);
-  console.log('Request body:', partner);
-
   if (!partner) {
     return next(new AppError('Partner not found', 404));
   }
@@ -934,7 +931,6 @@ exports.getPartnerCount = async (req, res) => {
   }
 };
 exports.findNearbyPartners = catchAsync(async (req, res, next) => {
-  console.log('findNearbyPartners called with query:', req.query);
 
   try {
     let { latitude, longitude, maxDistance } = req.query;
@@ -942,7 +938,6 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
     if (!latitude || !longitude) {
       latitude = "12.9716";
       longitude = "77.5946"; // Bangalore default
-      console.log("Using default Bangalore coordinates.");
     }
 
     const lat = parseFloat(latitude);

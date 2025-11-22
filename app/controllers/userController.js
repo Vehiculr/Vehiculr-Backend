@@ -97,8 +97,6 @@ exports.createPassword = catchAsync(async (req, res, next) => {
     if (req.body.password !== req.body.confirmPassword) {
       return next(new AppError('Passwords do not match.', 400));
     }
-    console.log("User for password update:", req.user.id);
-
     const user = await User.findById(req.user.id).select('+password');
     if (!user) {
       return next(new AppError('User not found.', 404));
@@ -154,8 +152,6 @@ exports.checkUsernameExists = async (req, res) => {
   try {
     const { username } = req.query;
     const user = await User.findOne({ username });
-    console.log('username', req.query)
-
     if (user) {
       return res.status(200).json({ exists: true, message: 'Username already taken' });
     } else {
@@ -689,7 +685,7 @@ exports.updateVehicles = catchAsync(async (req, res, next) => {
 // Getting the number of user present in the User Collection
 exports.getUserCount = catchAsync(async (req, res, next) => {
   try {
-    const count = await User.countDocuments(); 
+    const count = await User.countDocuments();
 
     res.status(200).json({
       status: 'success',
@@ -748,7 +744,6 @@ exports.updateRideAndDrives = catchAsync(async (req, res, next) => {
 // Get user vehicles
 exports.getUserVehicles = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
-console.log('getUserVehicles==>', userId)
   const user = await User.findById(userId).select('vehicles');
   if (!user) {
     return next(new AppError('User not found', 404));
@@ -791,7 +786,7 @@ exports.notifyGarageOwner = catchAsync(async (req, res, next) => {
   const partnerId = req.params.id;
   const partner = await Partner.findById(partnerId);
   if (!partner) return next(new AppError("Partner Garage not found", 404));
-  
+
   const userId = req.user.id;
   const user = await User.findById(userId);
   if (!user) return next(new AppError("User not found", 404));
@@ -813,10 +808,10 @@ Great news! *${userName}* has shown interest in your garage through Vehiculrr.\n
 This enquiry was sent from your listing on *Vehiculrr*, where we connect vehicle owners with trusted garages like yours.\n\n
 👉 Please reach out to *${userName}* at the above number, or share your service details and charges directly.\n\n
 Let’s not keep your next customer waiting!\n\n
-— *Team Vehiculrr* 🚀`; 
+— *Team Vehiculrr* 🚀`;
 
- const userMessage =
-      `Hey *${userName}* 👋,\n\n
+  const userMessage =
+    `Hey *${userName}* 👋,\n\n
 Your enquiry for *${garageName}* has been sent successfully via Vehiculrr.\n\n
 The garage owner will reach out to you soon at *${userPhone}*.\n\n
 Thanks for using *Vehiculrr*! 🚗`;
@@ -832,7 +827,7 @@ Thanks for using *Vehiculrr*! 🚗`;
     await sendWhatsAppMessage(ownerPhone, enquiryMessage);
 
     if (userPhone && userPhone !== "N/A" && userPhone !== ownerPhone) {
-      await new Promise(r => setTimeout(r, 2000)); 
+      await new Promise(r => setTimeout(r, 2000));
       await sendWhatsAppMessage(userPhone, userMessage);
     }
 

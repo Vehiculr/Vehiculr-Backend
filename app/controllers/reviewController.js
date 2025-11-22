@@ -5,11 +5,8 @@ const cloudinary = require("cloudinary").v2;
 
 // Add a Quick Review
 exports.addReview = async (req, res) => {
-  console.log("Add Review Request Received");
   try {
     const { garageId, garageName, vehicleType, rating, description, tags } = req.body;
-console.log("Received review data:", req.body);
-
     // ✅ Basic Validation
     if (!garageId || !garageName || !vehicleType || !rating) {
       return res.status(400).json({

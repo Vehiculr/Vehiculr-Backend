@@ -18,7 +18,6 @@ exports.sendOTPmsg91 = async (mobile, otp) => {
         'Content-Type': 'application/json'
       }
     });
-console.log('OTP sent successfully:', response.data);
     return response.data;
   } catch (err) {
     console.error('❌ Error sending OTP:', err.response?.data || err.message);

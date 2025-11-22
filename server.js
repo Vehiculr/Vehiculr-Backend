@@ -1,6 +1,4 @@
 require('dotenv').config();
-console.log("✅ MONGO_URI:", process.env.MONGO_URI);
-
 const mongoose = require('mongoose');
 require('express-async-errors');
 require('dotenv').config({ path: './.env' });
@@ -24,7 +22,7 @@ const disconnectDB = async () => {
 
 // Uncaught Exceptions (sync errors)
 process.on('uncaughtException', (err) => {
-logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
   logger.error(err.name, err.message);
   process.exit(1); // Optional: exit to avoid unstable state
 });
@@ -56,7 +54,8 @@ process.once('exit', async () => {
 
 const port = process.env.PORT || 9003;
 const server = app.listen(port, () => {
-logger.info(`🚀 App running on port ${port} in ${process.env.NODE_ENV} mode`)});
+  logger.info(`🚀 App running on port ${port} in ${process.env.NODE_ENV} mode`)
+});
 
 process.on('unhandledRejection', (err) => {
   console.log('UNHANDLED REJECTION! 💥 Shutting down...');
