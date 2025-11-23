@@ -141,7 +141,7 @@ const partnerSchema = new mongoose.Schema({
 
   googleId: { type: String, index: true },
 
-  role: { type: String, enum: ['user', 'partner', 'admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'partner', 'admin'], default: 'partner' },
   isVerified: { type: Boolean, default: false },
 
   quoteOtp: String,
