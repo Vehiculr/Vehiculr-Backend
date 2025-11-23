@@ -58,7 +58,17 @@ exports.createPartner = async (req, res) => {
         existingAccountType: "user"
       });
     }
-    const partner = await Partner.create(req.body);
+    const partnerServices = servicesMaster.map(cat => ({
+      categoryName: cat.categoryName,
+      subServices: cat.subServices.map(s => ({
+        name: s.name,
+        selected: false
+      }))
+    }));
+    const partner = await Partner.create({
+      ...req.body,
+      services: partnerServices,
+    });
     res.status(201).json({
       status: 'success',
       message: 'Partner created successfully',
@@ -1025,7 +1035,7 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
 
 exports.updatePartnerServices = async (req, res) => {
   try {
-    const partnerId = req.user.id; // from JWT middleware
+    const partnerId = req.user.id; 
     const { categoryName, serviceName, selected } = req.body;
 
     if (!categoryName || !serviceName) {
@@ -1036,20 +1046,32 @@ exports.updatePartnerServices = async (req, res) => {
     if (!partner) {
       return res.status(404).json({ message: "Partner not found" });
     }
+    // FIX → Case-insensitive matching
+    const category = partner.services.find(
+      c => c.categoryName.trim().toLowerCase() === categoryName.trim().toLowerCase()
+    );
 
-    const category = partner.services.find(c => c.categoryName === categoryName);
-    if (!category) return res.status(404).json({ message: "Category not found" });
+    if (!category) {
+      console.log("Available categories:", partner.services.map(s => s.categoryName));
+      return res.status(404).json({ message: "Category not found" });
+    }
 
-    const service = category.subServices.find(s => s.name === serviceName);
-    if (!service) return res.status(404).json({ message: "Sub service not found" });
+    const service = category.subServices.find(
+      s => s.name.trim().toLowerCase() === serviceName.trim().toLowerCase()
+    );
 
-    service.selected = selected; // true or false
+    if (!service) {
+      console.log("Available subservices:", category.subServices.map(s => s.name));
+      return res.status(404).json({ message: "Sub service not found" });
+    }
+
+    // Update service selected value
+    service.selected = selected;
 
     await partner.save();
 
     res.status(200).json({
-      message: `Service updated successfully`,
-      services: partner.services
+      message: "Service updated successfully",
     });
 
   } catch (err) {

@@ -15,6 +15,7 @@ const { sendWhatsAppMessage } = require('../services/twilioClient');
 require("dotenv").config();
 const { OAuth2Client } = require("google-auth-library");
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/tokenUtils');
+const servicesMaster = require('../services/partnerMasterServices');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -723,11 +724,17 @@ exports.verifyOTP = async (req, res) => {
     if (!isValidOTP) {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
-
+const partnerServices = servicesMaster.map(cat => ({
+      categoryName: cat.categoryName,
+      subServices: cat.subServices.map(s => ({
+        name: s.name,
+        selected: false
+      }))
+    }));
     // OTP valid → create new account if needed
     if (creatingNew) {
       if (accountType === "partner") {
-        account = await Partner.create({ phone, isVerified: true });
+        account = await Partner.create({ phone, isVerified: true, services: partnerServices, });
       } else {
         account = await User.create({ phone, isVerified: true });
       }
