@@ -1,13 +1,12 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
+/* -------------------------- KYC SUB-SCHEMA -------------------------- */
 const kycSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['Aadhar'],
+    enum: ["Aadhar"],
     required: true
   },
-
-  // From Cashfree OKYC Verify API
   fullName: String,
   dob: String,
   gender: String,
@@ -15,12 +14,10 @@ const kycSchema = new mongoose.Schema({
   address: String,
   photo: String,
 
-  // Aadhaar info
-  aadhaarMasked: String,   // XXXX-XXXX-1234
-  aadhaarLast4: String,    // 1234
+  aadhaarMasked: String,
+  aadhaarLast4: String,
 
-  // Cashfree OKYC
-  refId: String,           
+  refId: String,
   rawVerifyResponse: Object,
 
   verified: {
@@ -29,7 +26,7 @@ const kycSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
-// Brands schema
+/* ------------------------- BRANDS SUB-SCHEMA ------------------------- */
 const brandsSchema = new mongoose.Schema({
   carBrands: [{
     type: String,
@@ -44,19 +41,17 @@ const brandsSchema = new mongoose.Schema({
   }]
 }, { _id: false });
 
-// Partners schema
+/* -------------------------- PARTNER SCHEMA -------------------------- */
 const partnerSchema = new mongoose.Schema({
   garageId: {
-    type: String,
+    type: Number,
     unique: true,
     sparse: true
   },
-  fullName: {
-    type: String,
-  },
-  businessName: {
-    type: String,
-  },
+
+  fullName: String,
+  businessName: String,
+
   shopLocation: {
     type: {
       type: String,
@@ -64,50 +59,33 @@ const partnerSchema = new mongoose.Schema({
       default: 'Point'
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
+      type: [Number],
       default: [0, 0],
       required: true
     }
   },
   experience: {
-    type: Number, // years of experience
-    required: false,
-    min: 0,
+    type: Number,
+    min: 0
   },
   shopPhotos: [{
-    public_id: {
-      type: String,
-      required: true
-    },
-    url: {
-      type: String,
-      required: true
-    },
-    secure_url: {
-      type: String,
-      required: false
-    },
+    public_id: { type: String, required: true },
+    url: { type: String, required: true },
+    secure_url: String,
     format: String,
     bytes: Number,
     width: Number,
     height: Number,
-    created_at: {
-      type: Date,
-      default: Date.now
-    },
-    resource_type: {
-      type: String,
-      default: 'image'
-    }
+    created_at: { type: Date, default: Date.now },
+    resource_type: { type: String, default: 'image' }
   }],
   phone: {
     type: String,
     unique: true,
-    match: [/^\+91[0-9]{10}$/, 'Please enter a valid Indian phone number with +91']
+    match: [/^\+91[0-9]{10}$/, "Enter valid +91 phone number"]
   },
-  email: {
-    type: String
-  },
+
+  email: { type: String },
   picture: String,
   vehicleTypes: {
     type: [String],
@@ -115,20 +93,14 @@ const partnerSchema = new mongoose.Schema({
     required: true
   },
   accountType: { type: String, enum: ['user', 'partner'], default: 'partner' },
-  otp: {
-    type: String,
-  },
-  otpExpires: {
-    type: Date,
-  },
-  expertise: {
-    type: [String],
-    enum: [],
-    default: []
-  },
+
+  otp: String,
+  otpExpires: Date,
+
+  expertise: { type: [String], default: [] },
+
   kyc: kycSchema,
 
-  // CORRECTED: Use the brandsSchema
   brands: brandsSchema,
   services: [
     {
@@ -141,85 +113,72 @@ const partnerSchema = new mongoose.Schema({
       ]
     }
   ],
-  isPremium: {
-    type: Boolean,
-    default: false
-  },
-  bio: {
-    type: String,
-    trim: true,   // Kindly add a brief description about your garage and it’s expertise.
-  },
-  maxFreeBrands: {
-    type: Number,
-    default: 50   // brand limit befeoreIncreased limit for free accounts
+
+  isPremium: { type: Boolean, default: false },
+
+  bio: { type: String, trim: true },
+
+  maxFreeBrands: { type: Number, default: 50 },
+
+  qrCode: {
+    publicUrl: String,
+    displayUrl: String,
+    qrImageData: String,
+    generatedAt: { type: Date, default: Date.now },
+    lastUpdated: { type: Date, default: Date.now }
   },
 
-  // QR Code data
-  qrCode: {
-    publicUrl: {
-      type: String,
-      required: false
+  refreshTokens: [{
+    token: String,
+    deviceInfo: {
+      deviceId: String,
+      deviceType: String,
+      userAgent: String,
+      ip: String
     },
-    displayUrl: {
-      type: String,
-      required: false
-    },
-    qrImageData: {
-      type: String, // This will store the Data URL of the QR code image
-      required: false
-    },
-    generatedAt: {
-      type: Date,
-      default: Date.now
-    },
-    lastUpdated: {
-      type: Date,
-      default: Date.now
-    }
-  },
-  refreshTokens: [
-    {
-      token: String,
-      deviceInfo: {
-        deviceId: String,
-        deviceType: String,
-        userAgent: String,
-        ip: String
-      },
-      createdAt: { type: Date, default: Date.now },
-    }
-  ],
-  googleId: { type: String, index: true, unique: false }, // unique optional across both models
+    createdAt: { type: Date, default: Date.now }
+  }],
+
+  googleId: { type: String, index: true },
+
   role: { type: String, enum: ['user', 'partner', 'admin'], default: 'user' },
   isVerified: { type: Boolean, default: false },
 
-  // Also add quoteOtp fields if not already:
   quoteOtp: String,
-  quoteOtpExpires: Date,
+  quoteOtpExpires: Date
 
 }, { timestamps: true });
 
-// Add pre-save hook to initialize brands
-partnerSchema.pre('save', function (next) {
-  // Initialize garageId if not exists
-  if (!this.garageId && this._id) {
-    this.garageId = `GAR${this._id.toString().slice(-5).toUpperCase()}`;
+/* --------------------- UNIQUE 8-DIGIT NUMBER GENERATOR --------------------- */
+async function generateUniqueGarageId(model) {
+  let id, exists = true;
+
+  while (exists) {
+    id = Math.floor(1000000 + Math.random() * 9000000); // 8-digit
+    exists = await model.findOne({ garageId: id });
   }
-  if (this.isModified('qrCode')) {
+  return id;
+}
+
+/* ----------------------------- PRE-SAVE HOOK ----------------------------- */
+partnerSchema.pre("save", async function (next) {
+  if (!this.garageId) {
+    this.garageId = await generateUniqueGarageId(this.constructor);
+  }
+
+  if (this.isModified("qrCode")) {
     this.qrCode.lastUpdated = new Date();
   }
-  // Initialize brands object if not exists
+
   if (!this.brands) {
-    this.brands = {
-      carBrands: [],
-      bikeBrands: []
-    };
+    this.brands = { carBrands: [], bikeBrands: [] };
   }
-  
 
   next();
 });
-partnerSchema.index({ shopLocation: '2dsphere' });
 
-const Partner = mongoose.model('Partner', partnerSchema);
-module.exports = Partner;
+/* ------------------------------ INDEXES ---------------------------------- */
+partnerSchema.index({ shopLocation: "2dsphere" });
+partnerSchema.index({ garageId: 1 }, { unique: true });
+
+module.exports = mongoose.model("Partner", partnerSchema);
