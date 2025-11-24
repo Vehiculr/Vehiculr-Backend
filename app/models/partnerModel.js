@@ -69,7 +69,6 @@ const partnerSchema = new mongoose.Schema({
     min: 0
   },
   shopPhotos: [{
-    public_id: { type: String, required: true },
     url: { type: String, required: true },
     secure_url: String,
     format: String,

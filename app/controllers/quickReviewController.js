@@ -1,7 +1,8 @@
 const quickReview = require("../models/quickReviewModel");
 const Partner = require("../models/partnerModel");
-const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
-const cloudinary = require("cloudinary").v2;
+// const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
+const { uploadMultipleToS3 } = require('../utils/aws-S3-Config');
+// const cloudinary = require("cloudinary").v2;
 
 // Add a Quick Review
 exports.addQuickReview = async (req, res) => {
@@ -16,30 +17,53 @@ exports.addQuickReview = async (req, res) => {
     }
 
     // ✅ Photo Upload Handling (if images exist)
-    let reviewPhotos = [];
+    // let reviewPhotos = [];
+
+    // if (req.files && req.files.length > 0) {
+    //   if (req.files.length > 4) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: "Maximum 4 images allowed for a quickReview.",
+    //     });
+    //   }
+
+    //   const uploadResults = await uploadMultipleToCloudinary(req.files, {
+    //     folder: 'quickReview-photos',
+    //     transformation: [
+    //       { width: 1200, height: 900, crop: "limit", quality: "auto" }
+    //     ]
+    //   });
+
+    //   reviewPhotos = uploadResults.map(result => ({
+    //     public_id: result.public_id,
+    //     url: result.secure_url,
+    //     width: result.width,
+    //     height: result.height,
+    //     bytes: result.bytes,
+    //     created_at: result.created_at,
+    //   }));
+    // }
+
+
+    //✅ s3 Photo Upload Handling (if images exist)
+    let leadPhotos = [];
 
     if (req.files && req.files.length > 0) {
       if (req.files.length > 4) {
         return res.status(400).json({
           success: false,
-          message: "Maximum 4 images allowed for a quickReview.",
+          message: "Maximum 4 photos allowed."
         });
       }
 
-      const uploadResults = await uploadMultipleToCloudinary(req.files, {
-        folder: 'quickReview-photos',
-        transformation: [
-          { width: 1200, height: 900, crop: "limit", quality: "auto" }
-        ]
-      });
-
-      reviewPhotos = uploadResults.map(result => ({
-        public_id: result.public_id,
-        url: result.secure_url,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes,
-        created_at: result.created_at,
+      const uploadResults = await uploadMultipleToS3(
+        req.files,
+        folder = 'quickReview-photos',
+      );
+      leadPhotos = uploadResults.map((p) => ({
+        url: p.url,
+        key: p.key,
+        bucket: p.bucket
       }));
     }
 
@@ -48,7 +72,7 @@ exports.addQuickReview = async (req, res) => {
       garageId,
       garageName,
       vehicle,
-      photos: reviewPhotos, // ✅ Saved Cloudinary Photos
+      photos: leadPhotos, // ✅ Saved Cloudinary Photos
       rating,
       description,
       tags,

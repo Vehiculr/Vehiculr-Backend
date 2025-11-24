@@ -6,6 +6,7 @@ const sendEmail = require('../utils/email');
 const { sendOTP } = require('../services/twilioClient');
 const { generateOTP } = require('../utils/generateOTP');
 const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
+const { uploadMultipleToS3 } = require('../utils/aws-S3-Config');
 const cloudinary = require("cloudinary").v2;
 const { sendWhatsAppMessage } = require("../services/twilioClient"); // Import Twilio utility
 
@@ -103,30 +104,24 @@ exports.createLead = async (req, res) => {
     } = req.body;
     // Multer stores file info in req.files
     // ✅ Photo Upload Handling (if images exist)
-    let leadPhotos = [];
+  let leadPhotos = [];
 
     if (req.files && req.files.length > 0) {
       if (req.files.length > 4) {
         return res.status(400).json({
           success: false,
-          message: "Maximum 4 images allowed for a send quates.",
+          message: "Maximum 4 photos allowed."
         });
       }
 
-      const uploadResults = await uploadMultipleToCloudinary(req.files, {
-        folder: 'leads-photos',
-        transformation: [
-          { width: 1200, height: 900, crop: "limit", quality: "auto" }
-        ]
-      });
-
-      leadPhotos = uploadResults.map(result => ({
-        public_id: result.public_id,
-        url: result.secure_url,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes,
-        created_at: result.created_at,
+      const uploadResults = await uploadMultipleToS3(
+        req.files,
+         folder = "lead-photos" 
+      );
+      leadPhotos = uploadResults.map((p) => ({
+        url: p.url,
+        key: p.key,
+        bucket: p.bucket
       }));
     }
 
@@ -140,7 +135,7 @@ exports.createLead = async (req, res) => {
       notes,
       budget,
       garageId,
-      photos: leadPhotos, // ✅ Saved Cloudinary Photos
+      photos: leadPhotos, // ✅ Saved aws Photos
     });
 
     await lead.save();
@@ -293,9 +288,9 @@ exports.createLeadAndNotify = async (req, res) => {
       budget
     } = req.body;
 
-    // --------------------------------------
-    // 1) UPLOAD PHOTOS
-    // --------------------------------------
+    // ------------------------------
+    // 1) Upload Photos to AWS S3
+    // ------------------------------
     let leadPhotos = [];
 
     if (req.files && req.files.length > 0) {
@@ -306,25 +301,20 @@ exports.createLeadAndNotify = async (req, res) => {
         });
       }
 
-      const uploadResults = await uploadMultipleToCloudinary(req.files, {
-        folder: 'lead-photos',
-        transformation: [{ width: 1200, height: 900, crop: "limit" }]
-      });
-
-      leadPhotos = uploadResults.map(p => ({
-        public_id: p.public_id,
+      const uploadResults = await uploadMultipleToS3(
+        req.files,
+         folder = "lead-photos" 
+      );
+      leadPhotos = uploadResults.map((p) => ({
         url: p.url,
-        format: p.format,
-        width: p.width,
-        height: p.height,
-        bytes: p.bytes,
-        created_at: p.created_at,
+        key: p.key,
+        bucket: p.bucket
       }));
     }
 
-    // --------------------------------------
+    // ------------------------------
     // 2) SAVE LEAD IN DB
-    // --------------------------------------
+    // ------------------------------
     const lead = await Lead.create({
       userName,
       userPhone,
@@ -338,17 +328,16 @@ exports.createLeadAndNotify = async (req, res) => {
       garageId,
       status: "new"
     });
-    // --------------------------------------
+
+    // ------------------------------
     // 3) SEND WHATSAPP TO GARAGE OWNER
-    // --------------------------------------
-    const partner = await Partner.findOne({ garageId: garageId });
+    // ------------------------------
+    const partner = await Partner.findOne({ garageId });
 
     if (!partner)
       return res.status(404).json({ success: false, message: "Garage not found" });
 
     const ownerPhone = partner.phone;
-    if (!ownerPhone)
-      return res.status(400).json({ success: false, message: "Garage owner has no WhatsApp number." });
 
     const enquiryMessage = `
 🚗 *New Quotation Request on Garages of India!*
@@ -366,7 +355,7 @@ A customer has requested a quote.
 
 Please respond with a quotation ASAP.
 – *Garages of India Team*
-    `;
+`;
 
     const userMessage = `
 Hey *${userName}* 👋,
@@ -376,17 +365,11 @@ Your quote request has been sent to *${partner.businessName}*.
 They will contact you shortly on *${userPhone}*.
 
 Thanks for using *Garages of India* 🚗✨
-    `;
+`;
 
-    // Send to Garage
     await sendWhatsAppMessage(ownerPhone, enquiryMessage);
-
-    // Send to User
     await sendWhatsAppMessage(userPhone, userMessage);
 
-    // --------------------------------------
-    // 4) SAVE LOGS
-    // --------------------------------------
     lead.whatsappLogs = {
       partnerMessage: enquiryMessage,
       userMessage: userMessage,

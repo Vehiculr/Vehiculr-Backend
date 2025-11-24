@@ -11,16 +11,22 @@ const { validateOTPRequest, validateOTPVerification } = require('../valiations/p
 const { googleLogin } = require("../controllers/authController");
 
 // Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/')
-  },
-  filename: function (req, file, cb) {
+// / const storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     cb(null, 'uploads/')
+//   },
+//   filename: function (req, file, cb) {
+//     // Create a unique filename with timestamp
+//     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+//     cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
+//   }
+// });
+
+const storage = multer.memoryStorage({filename: function (req, file, cb) {
     // Create a unique filename with timestamp
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
-  }
-});
+  }});
 
 const fileFilter = (req, file, cb) => {
   // Accept images only

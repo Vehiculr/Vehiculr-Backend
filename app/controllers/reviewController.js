@@ -2,6 +2,7 @@ const Review = require("../models/reviewModel");
 const Partner = require("../models/partnerModel");
 const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
+const { uploadMultipleToS3, getSignedS3Url } = require('../utils/aws-S3-Config');
 
 // Add a Quick Review
 exports.addReview = async (req, res) => {
@@ -30,20 +31,16 @@ exports.addReview = async (req, res) => {
         });
       }
 
-      const uploadResults = await uploadMultipleToCloudinary(req.files, {
-        folder: 'review-photos',
-        transformation: [
-          { width: 1200, height: 900, crop: "limit", quality: "auto" }
-        ]
+      const uploadResults = await uploadMultipleToS3(
+        req.files, {
+        folder: 'review-photos'
+      
       });
 
       reviewPhotos = uploadResults.map(result => ({
-        public_id: result.public_id,
-        url: result.secure_url,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes,
-        created_at: result.created_at,
+        url: result.url,
+        key: result.key,
+        bucket: result.bucket,
       }));
     }
 
@@ -54,7 +51,7 @@ exports.addReview = async (req, res) => {
       userId,
       userName,
       vehicleType,
-      photos: reviewPhotos, // ✅ Saved Cloudinary Photos
+      photos: reviewPhotos, // ✅ Saved Photos s3
       rating,
       description,
       tags,

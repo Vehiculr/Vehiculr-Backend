@@ -4,8 +4,9 @@ const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
-const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
-const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
+// const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
+// const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
+const { uploadMultipleToS3, getSignedS3Url } = require('../utils/aws-S3-Config');
 const cloudinary = require("cloudinary").v2;
 const multer = require('multer');
 const { carBrands, bikeBrands } = require('../valiations/brandValidation');
@@ -27,6 +28,9 @@ const servicesMaster = require('../services/partnerMasterServices');
 // const { sendWhatsAppOTP } = require('../utils/notificationService');
 // const Service = require('../models/serviceModel');
 // const PremiumPlan = require('../models/premiumPlanModel');
+const AWS = require("aws-sdk");
+const s3 = new AWS.S3();
+const S3_BUCKET = process.env.AWS_BUCKET_NAME;
 
 exports.setUserId = (req, res, next) => {
   req.params.id = req.user.id;
@@ -413,125 +417,87 @@ exports.checkBrandLimit = catchAsync(async (req, res, next) => {
 });
 
 exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
+  let uploadedToS3 = [];
+
   try {
     const partnerId = req.user.id;
 
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Please select at least one image to upload",
-      });
+      return res.status(400).json({ success: false, message: "Please select at least one image to upload" });
     }
 
     const partner = await Partner.findById(partnerId);
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        message: "Partner not found",
-      });
-    }
+    if (!partner) return res.status(404).json({ success: false, message: "Partner not found" });
 
-    // Check current photo count
-    const currentPhotoCount = partner.shopPhotos ? partner.shopPhotos.length : 0;
+    const currentPhotoCount = partner.shopPhotos?.length || 0;
     const newPhotoCount = req.files.length;
 
     if (currentPhotoCount + newPhotoCount > 4) {
       return res.status(400).json({
         success: false,
-        message: `Maximum 4 photos allowed. You already have ${currentPhotoCount} photos and trying to add ${newPhotoCount} more.`,
+        message: `Maximum 4 photos allowed. You already have ${currentPhotoCount} photos`,
       });
     }
 
-    // Upload all files to Cloudinary
-    const uploadResults = await uploadMultipleToCloudinary(req.files, {
-      folder: 'partner-shop-photos',
-      transformation: [
-        { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
-      ]
-    });
+    // Upload to S3
+    uploadedToS3 = await uploadMultipleToS3(req.files, folder = "partner-shop-photos" );
 
-    const cloudinaryDataArray = uploadResults.map(result => ({
-      public_id: result.public_id,
-      url: result.url,
-      format: result.format,
-      bytes: result.bytes,
-      width: result.width,
-      height: result.height,
-      created_at: result.created_at,
-      resource_type: result.resource_type
+    const s3Photos = uploadedToS3.map((p) => ({
+      key: p.key,
+      url: p.url,
+      bucket: p.bucket,
+      format: p.format,
+      bytes: p.bytes,
+      width: p.width,
+      height: p.height,
+      created_at: p.created_at,
     }));
 
-    // Initialize shopPhotos array if it doesn't exist
-    if (!partner.shopPhotos) {
-      partner.shopPhotos = [];
-    }
+    partner.shopPhotos = partner.shopPhotos || [];
+    partner.shopPhotos.push(...s3Photos);
 
-    // Add new photos to existing ones
-    partner.shopPhotos = [...partner.shopPhotos, ...cloudinaryDataArray];
-
-    // Ensure we don't exceed 4 photos (safety check)
+    // Keep max 4
     if (partner.shopPhotos.length > 4) {
-      // Delete the excess photos from Cloudinary
-      const excessPhotos = partner.shopPhotos.slice(4);
-      for (const photo of excessPhotos) {
+      const excess = partner.shopPhotos.slice(4);
+
+      for (const photo of excess) {
         try {
-          await cloudinary.uploader.destroy(photo.public_id);
-        } catch (deleteError) {
-          console.error("Error deleting excess photo:", deleteError);
+          await s3
+            .deleteObject({
+              Bucket: S3_BUCKET,
+              Key: photo.key,
+            })
+            .promise();
+        } catch (err) {
+          console.error("Error deleting excess photos:", err);
         }
       }
-      // Keep only first 4 photos
+
       partner.shopPhotos = partner.shopPhotos.slice(0, 4);
     }
 
     await partner.save();
 
-    // Generate optimized URLs for all photos
-    const optimizedPhotos = partner.shopPhotos.map(photo => ({
-      id: photo.public_id,
-      original: photo.url,
-      thumbnail: cloudinary.url(photo.public_id, {
-        width: 150,
-        height: 150,
-        crop: "fill",
-        quality: "auto"
-      }),
-      medium: cloudinary.url(photo.public_id, {
-        width: 400,
-        height: 300,
-        crop: "fill",
-        quality: "auto"
-      }),
-      large: cloudinary.url(photo.public_id, {
-        width: 800,
-        height: 600,
-        crop: "limit",
-        quality: "auto"
-      })
-    }));
-
     res.status(200).json({
       success: true,
       message: "Shop photos uploaded successfully",
-      data: {
-        total_photos: partner.shopPhotos.length,
-        uploaded_count: uploadResults.length,
-        photos: optimizedPhotos,
-        max_allowed: 4
-      },
+      data: partner.shopPhotos,
     });
   } catch (error) {
-    console.error("Error uploading shop photos:", error);
+    console.error("Error uploading:", error);
 
-    // Clean up: Delete any uploaded files if error occurs
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        if (file.filename) { // If files were uploaded to Cloudinary
-          try {
-            await cloudinary.uploader.destroy(file.filename);
-          } catch (cleanupError) {
-            console.error("Error cleaning up file:", cleanupError);
-          }
+    // 🟢 CLEANUP ONLY FILES THAT WERE UPLOADED TO S3
+    if (uploadedToS3.length > 0) {
+      for (const file of uploadedToS3) {
+        try {
+          await s3
+            .deleteObject({
+              Bucket: process.env.S3_BUCKET,
+              Key: file.key,
+            })
+            .promise();
+        } catch (cleanupError) {
+          console.error("Error cleaning S3:", cleanupError);
         }
       }
     }
@@ -539,10 +505,11 @@ exports.uploadShopPhotos = catchAsync(async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: "Server error while uploading shop photos",
-      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error",
     });
   }
 });
+
+
 
 // Send WhatsApp OTP
 exports.sendWhatsAppOTP = catchAsync(async (req, res, next) => {
@@ -1035,14 +1002,15 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
 
 exports.updatePartnerServices = async (req, res) => {
   try {
-    const partnerId = req.user.id; 
+    const partnerId = req.user.id;
     const { categoryName, serviceName, selected } = req.body;
-
+    console.log("Request body:", req.body);
     if (!categoryName || !serviceName) {
       return res.status(400).json({ message: "categoryName and serviceName are required" });
     }
 
     const partner = await Partner.findById(partnerId);
+    console.log("Partner found:", partner);
     if (!partner) {
       return res.status(404).json({ message: "Partner not found" });
     }

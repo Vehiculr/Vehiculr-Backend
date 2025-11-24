@@ -9,6 +9,7 @@ const filterObj = require('../utils/filterObject');
 const Topic = require('../models/topicsModel');
 const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
 const { uploadToCloudinary } = require('../utils/cloudinaryConfig');
+const { uploadToS3, deleteFromS3 } = require('../utils/aws-S3-Config');
 const cloudinary = require("cloudinary").v2;
 const { sendWhatsAppMessage } = require("../services/twilioClient"); // Import Twilio utility
 
@@ -316,48 +317,31 @@ exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
       });
     }
 
-    const result = await uploadToCloudinary(req.file);
-    const cloudinaryData = {
-      public_id: result.public_id,
-      url: result.url,
-      format: result.format,
-      bytes: result.bytes,
-      width: result.width,
-      height: result.height,
-      created_at: result.created_at,
+    // === Upload new avatar to S3 ===
+    const upload = await uploadToS3(req.file, "user-avatars");
+
+    const avatarData = {
+      key: upload.key,
+      url: upload.url,
+      bucket: upload.bucket,
+      uploadedAt: new Date(),
     };
 
-    // Delete old avatar from Cloudinary if exists
-    if (user.avatar && user.avatar.public_id) {
-      try {
-        await cloudinary.uploader.destroy(user.avatar.public_id);
-        console.log(`Deleted old avatar: ${user.avatar.public_id}`);
-      } catch (deleteError) {
-        console.error("Error deleting old avatar:", deleteError);
-      }
+    // === Delete old avatar from S3 if exists ===
+    if (user.avatar && user.avatar.key) {
+      await deleteFromS3(user.avatar.key);
     }
-    // Update user with new avatar info
-    user.avatar = cloudinaryData;
+
+    // === Save new avatar ===
+    user.avatar = avatarData;
     await user.save();
 
-    // Generate optimized URLs
+    // Return various usable URLs
     const optimizedUrls = {
-      thumbnail: cloudinary.url(result.public_id, {
-        width: 100,
-        height: 100,
-        crop: "fill",
-      }),
-      medium: cloudinary.url(result.public_id, {
-        width: 300,
-        height: 300,
-        crop: "fill",
-      }),
-      large: cloudinary.url(result.public_id, {
-        width: 500,
-        height: 500,
-        crop: "limit",
-      }),
-      original: result.secure_url,
+      small: upload.url,          // Same URL (S3 can't resize natively)
+      medium: upload.url,
+      large: upload.url,
+      original: upload.url,
     };
 
     res.status(200).json({
@@ -379,6 +363,7 @@ exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
     });
   }
 });
+
 
 
 
