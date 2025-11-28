@@ -114,8 +114,7 @@ exports.getAllQuickReviews = async (req, res) => {
 exports.getQuickReviewsByGarage = async (req, res) => {
   try {
     const { garageId } = req.params;
-
-    const partner = await Partner.findOne({ garageId });
+    const partner = await quickReview.find({ garageId });
 
     if (!partner) {
       return res.status(404).json({

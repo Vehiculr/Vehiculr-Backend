@@ -28,9 +28,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     unique: true,
     trim: true,
-    minlength: 3,
     maxlength: 30,
-    match: /^[a-zA-Z0-9_]+$/ // Alphanumeric and underscores only
+    match: /^[a-zA-Z0-9_]+$/, // Alphanumeric and underscores only
+    default: ''
   },
   userType: { type: String, enum: ['garageOwner', 'vehicleUser'], default: 'vehicleUser' },
   interests: [String], // e.g., "Car Modifications", "EV", etc.
