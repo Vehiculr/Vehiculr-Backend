@@ -94,7 +94,7 @@ exports.getReviewsByGarage = async (req, res) => {
   try {
     const { garageId } = req.params;
 
-    const partner = await Partner.findOne({ garageId });
+    const partner = await Review.find({ garageId });
 
     if (!partner) {
       return res.status(404).json({
