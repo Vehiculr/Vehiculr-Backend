@@ -1065,3 +1065,87 @@ exports.getAllServices = async (req, res) => {
     });
   }
 };
+
+exports.getSelectedServices = async (req, res) => {
+  try {
+    const partnerId = req.user.id;
+console.log("Fetching selected services for partner ID:", partnerId);
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ message: "Partner not found" });
+    }
+
+    const selectedServices = partner.services
+      .map(category => ({
+        categoryName: category.categoryName,
+        subServices: category.subServices.filter(s => s.selected === true)
+      }))
+      .filter(cat => cat.subServices.length > 0);
+
+    return res.status(200).json({
+      success: true,
+      message: "Selected services fetched successfully",
+      data: selectedServices
+    });
+  } catch (error) {
+    console.error("Error fetching selected services:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+  }
+};
+
+
+exports.getUnselectedServices = async (req, res) => {
+  try {
+    const partnerId = req.user.id;
+
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ message: "Partner not found" });
+    }
+
+    const unselectedServices = partner.services
+      .map(category => ({
+        categoryName: category.categoryName,
+        subServices: category.subServices.filter(s => s.selected === false)
+      }))
+      .filter(cat => cat.subServices.length > 0);
+
+    return res.status(200).json({
+      success: true,
+      message: "Unselected services fetched successfully",
+      data: unselectedServices
+    });
+  } catch (error) {
+    console.error("Error fetching unselected services:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+  }
+};
+
+exports.getAllPartnerServices = async (req, res) => {
+  try {
+    const partnerId = req.user.id;
+
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ message: "Partner not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "All partner services fetched successfully",
+      data: partner.services
+    });
+  } catch (error) {
+    console.error("Error fetching partner services:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+  }
+};

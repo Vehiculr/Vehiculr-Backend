@@ -72,10 +72,11 @@ exports.addQuickReview = async (req, res) => {
       garageId,
       garageName,
       vehicle,
-      photos: leadPhotos, // ✅ Saved Cloudinary Photos
+      photos: leadPhotos, // ✅ Saved s3 Photos
       rating,
       description,
       tags,
+      reviewType: "quickReview"
     });
 
     await newReview.save();

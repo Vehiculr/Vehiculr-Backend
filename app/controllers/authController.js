@@ -1144,6 +1144,7 @@ exports.loginRequestOTP = catchAsync(async (req, res, next) => {
 
   if (!phone) return next(new AppError("Phone number is required", 400));
 
+  // Find user/partner in parallel
   const [foundUser, foundPartner] = await Promise.all([
     User.findOne({ phone }),
     Partner.findOne({ phone }),
@@ -1155,23 +1156,29 @@ exports.loginRequestOTP = catchAsync(async (req, res, next) => {
 
   const accountType = foundUser ? "user" : "partner";
 
+  // Generate OTP
   const otp = generateOTP();
-  const otpExpires = new Date(Date.now() + (process.env.OTP_EXPIRY || 10) * 60000);
+  const expiryMinutes = Number(process.env.OTP_EXPIRY) || 10;
+  const otpExpires = Date.now() + expiryMinutes * 60 * 1000;
 
   account.otp = otp;
-  account.otpExpires = otpExpires;
+  account.otpExpires = new Date(otpExpires);
   await account.save();
 
+  // Send OTP
   const otpResponse = await sendOTP(phone, otp);
   if (!otpResponse.success)
     return next(new AppError("Failed to send OTP", 500));
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "OTP sent successfully for login",
-    mode: isProduction() ? "production" : "development",
     accountType,
-    ...(!isProduction() && { otp, expiresIn: `${process.env.OTP_EXPIRY || 10} minutes` }),
+    mode: isProduction() ? "production" : "development",
+    ...(!isProduction() && {
+      otp,
+      expiresIn: `${expiryMinutes} minutes`,
+    }),
   });
 });
 
@@ -1180,6 +1187,7 @@ exports.loginRequestOTP = catchAsync(async (req, res, next) => {
  ***********************************/
 exports.loginVerifyOTP = catchAsync(async (req, res, next) => {
   const { phone, otp } = req.body;
+
   if (!phone || !otp)
     return next(new AppError("Phone and OTP are required", 400));
 
@@ -1194,24 +1202,35 @@ exports.loginVerifyOTP = catchAsync(async (req, res, next) => {
   const accountType = foundUser ? "user" : "partner";
 
   let isValidOTP = false;
-  console.log('Verifying OTP for account:', accountType, account.phone);
-  if (isProduction()) {
-    isValidOTP = account.otp === otp && account.otpExpires > Date.now();
-  } else {
-    const testOTP = process.env.DEFAULT_OTP || "12345";
-    isValidOTP =
-      (account.otp === otp && account.otpExpires > Date.now()) || otp === testOTP;
 
-    if (otp === testOTP) console.log("✅ Development mode: Test OTP used");
+  console.log(
+    `🔎 Verifying OTP for ${accountType} -> ${account.phone}`
+  );
+
+  const testOTP = process.env.DEFAULT_OTP || "12345";
+  const now = Date.now();
+
+  if (isProduction()) {
+    isValidOTP = account.otp === otp && account.otpExpires > now;
+  } else {
+    // In development mode allow master test OTP
+    isValidOTP =
+      (account.otp === otp && account.otpExpires > now) ||
+      otp === testOTP;
+
+    if (otp === testOTP) {
+      console.log("⚠️ Dev Mode: Using DEFAULT_OTP (test bypass)");
+    }
   }
 
   if (!isValidOTP)
     return next(new AppError("Invalid or expired OTP", 400));
 
-  // Clear OTP after successful login
+  // Clear OTP after success
   account.otp = undefined;
   account.otpExpires = undefined;
   await account.save();
 
-  createSendToken(account, 200, res);
+  // Send JWT + cookie
+  return createSendToken(account, 200, res);
 });

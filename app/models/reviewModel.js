@@ -12,6 +12,12 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    reviewType: {
+      type: String,
+      enum: ["quickReview ", "normalReview"],
+      default: "normalReview",
+      required: true
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -50,7 +50,22 @@ app.use(
 );
 
 //Implement CORS
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://13.27.251.120',   // your production frontend domain
+  'https://vehiculr.com' // add if HTTPS
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS: ' + origin));
+    }
+  },
+  credentials: true,
+}));
 app.options('*', cors());
 
 app.use(express.json());
@@ -75,6 +90,12 @@ const limiter = rateLimit({
 securityMiddleware(app); // Add security middleware
 
 app.use('/api', limiter);
+
+// ===== Global Route Debug Log =====
+app.use((req, res, next) => {
+  console.log(`🧭 Route Hit: ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // 2) ROUTES
 app.use('/api/users', userRouter);

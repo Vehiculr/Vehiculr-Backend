@@ -34,7 +34,6 @@ exports.addReview = async (req, res) => {
       const uploadResults = await uploadMultipleToS3(
         req.files, {
         folder: 'review-photos'
-      
       });
 
       reviewPhotos = uploadResults.map(result => ({
@@ -55,6 +54,7 @@ exports.addReview = async (req, res) => {
       rating,
       description,
       tags,
+      reviewType: "normalReview"
     });
 
     await newReview.save();
@@ -76,18 +76,18 @@ exports.addReview = async (req, res) => {
 };
 
 // Get All Reviews (Optional)
-exports.getAllReviews = async (req, res) => {
-  try {
-    const reviews = await Review.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: reviews });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch reviews.",
-      error: error.message,
-    });
-  }
-};
+// exports.getAllReviews = async (req, res) => {
+//   try {
+//     const reviews = await Review.find().sort({ createdAt: -1 });
+//     res.status(200).json({ success: true, data: reviews });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch reviews.",
+//       error: error.message,
+//     });
+//   }
+// };
 
 // Get Reviews by Garage ID
 exports.getReviewsByGarage = async (req, res) => {
@@ -113,6 +113,80 @@ exports.getReviewsByGarage = async (req, res) => {
       success: false,
       message: "Internal Server Error.",
       error: error.message,
+    });
+  }
+};
+
+exports.getAllReviews = async (req, res) => {
+  try {
+    const { garageId } = req.params;
+    const { page = 1, limit = 10, sort = "latest" } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    const sortOrder = sort === "oldest" ? 1 : -1;
+
+    const pipeline = [
+
+      // ====== Normal Reviews ======
+      {
+        $match: { garageId }
+      },
+      {
+        $addFields: { reviewType: "normal" }
+      },
+
+      // ====== UNION WITH QUICK REVIEWS ======
+      {
+        $unionWith: {
+          coll: "quickreviews",  // collection name
+          pipeline: [
+            { $match: { garageId } },
+            { $addFields: { reviewType: "quick" } }
+          ]
+        }
+      },
+
+      // ====== Sort (latest/oldest) ======
+      { $sort: { createdAt: sortOrder } },
+
+      // ====== Pagination ======
+      { $skip: skip },
+      { $limit: parseInt(limit) }
+    ];
+
+    const reviews = await Review.aggregate(pipeline);
+
+    // ===== Count total =====
+    const countPipeline = [
+      { $match: { garageId } },
+      {
+        $unionWith: {
+          coll: "quickreviews",
+          pipeline: [{ $match: { garageId } }]
+        }
+      },
+      { $count: "total" }
+    ];
+
+    const totalResult = await Review.aggregate(countPipeline);
+    const total = totalResult?.[0]?.total || 0;
+
+    res.status(200).json({
+      success: true,
+      message: "All reviews fetched successfully",
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      reviews
+    });
+
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
     });
   }
 };

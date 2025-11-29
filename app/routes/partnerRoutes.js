@@ -54,11 +54,6 @@ router.get('/count', partnerController.getPartnerCount);
 
 router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
-// ===== Debug Log =====
-router.use((req, res, next) => {
-  console.log('🧭 Partner Route Hit:', req.originalUrl);
-  next();
-});
 
 // ===== Public routes =====
 router.get('/nearby', partnerController.findNearbyPartners);
@@ -92,6 +87,9 @@ router.get('/', partnerController.getAllPartners);
 //===All Servises from Master===
 router.get('/getAllServises', partnerController.getAllServices);
 router.patch('/updatePartnerServices', protect, partnerController.updatePartnerServices);
+router.get("/services/selected", protect, partnerController.getSelectedServices);
+router.get("/services/unselected", protect, partnerController.getUnselectedServices);
+router.get("/services/getAllPartnerServices", protect, partnerController.getAllPartnerServices);
 
 // ===== Must always be LAST =====
 router.get('/:id', partnerController.getPartnerById);

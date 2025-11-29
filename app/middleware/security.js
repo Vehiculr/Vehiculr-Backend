@@ -1,6 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const cors = require('cors');
+// const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const hpp = require('hpp');
@@ -40,13 +40,13 @@ const uploadLimiter = rateLimit({
 });
 
 // CORS configuration
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-    : 'http://localhost:3000',
-  credentials: true,
-  optionsSuccessStatus: 200
-};
+// const corsOptions = {
+//   origin: process.env.NODE_ENV === 'production' 
+//     ? process.env.FRONTEND_URL 
+//     : 'http://localhost:3000',
+//   credentials: true,
+//   optionsSuccessStatus: 200
+// };
 
 // Security middleware setup
 const securityMiddleware = (app) => {
@@ -54,7 +54,7 @@ const securityMiddleware = (app) => {
   app.use(helmet());
   
   // Enable CORS
-  app.use(cors(corsOptions));
+  // app.use(cors(corsOptions));
   
   // Data sanitization against NoSQL query injection
   app.use(mongoSanitize());
