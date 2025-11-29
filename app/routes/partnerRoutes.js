@@ -60,6 +60,7 @@ router.get('/nearby', partnerController.findNearbyPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
 router.get('/garage/:garageId', publicQrController.getGarageByPublicId);
 router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
+router.get('/getAllPartners', partnerController.getAllPartnersByVehicleTypes);
 
 // ===== Auth routes =====
 router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);

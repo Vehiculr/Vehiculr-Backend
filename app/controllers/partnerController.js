@@ -907,13 +907,13 @@ exports.getPartnerCount = async (req, res) => {
     });
   }
 };
-exports.findNearbyPartners = catchAsync(async (req, res, next) => {
+exports.findNearbyPartners = async (req, res, next) => {
 
   try {
     let { latitude, longitude, maxDistance } = req.query;
 
     if (!latitude || !longitude) {
-      latitude = "12.9716";
+      latitude = "12.8716";
       longitude = "77.5946"; // Bangalore default
     }
 
@@ -936,6 +936,8 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
     // If the user provides maxDistance, treat it as kilometers (km)
     // Convert km -> meters for MongoDB. Default = 10 km => 10000 meters
     const radiusMeters = maxDistance ? Number(maxDistance) * 1000 : 10000;
+
+    console.log("Searching partners near:", lat, lng, "within (meters):", radiusMeters);  
 
     if (isNaN(radiusMeters) || radiusMeters < 0) {
       return res.status(400).json({
@@ -998,7 +1000,7 @@ exports.findNearbyPartners = catchAsync(async (req, res, next) => {
       error: error.message,
     });
   }
-});
+};
 
 exports.updatePartnerServices = async (req, res) => {
   try {
@@ -1146,6 +1148,42 @@ exports.getAllPartnerServices = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal Server Error"
+    });
+  }
+};
+
+exports.getAllPartnersByVehicleTypes = async (req, res) => {
+  try {
+    const { vehicleTypes } = req.query; // Car / Bike
+
+    let filter = {};
+
+    // If vehicleTypes is provided, filter only those
+    if (vehicleTypes) {
+      if (!["Car", "Bike"].includes(vehicleTypes)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid vehicleTypes value. Allowed: Car, Bike"
+        });
+      }
+
+      filter.vehicleTypes = vehicleTypes;   // matches array items
+    }
+
+    const partners = await Partner.find(filter);
+
+    res.status(200).json({
+      success: true,
+      message: "Partners fetched successfully",
+      count: partners.length,
+      data: partners
+    });
+
+  } catch (error) {
+    console.error("Error fetching partners:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
     });
   }
 };

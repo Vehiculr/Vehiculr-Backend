@@ -87,8 +87,10 @@ const partnerSchema = new mongoose.Schema({
   email: { type: String },
   picture: String,
   vehicleTypes: {
-    type: [String],
-    enum: ["Car", "Bike"],
+    type: [{
+      type: String,
+      enum: ["Car", "Bike"]
+    }],
     required: true
   },
   accountType: { type: String, enum: ['user', 'partner'], default: 'partner' },
