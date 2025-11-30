@@ -88,10 +88,9 @@ router.get('/', partnerController.getAllPartners);
 //===All Servises from Master===
 router.get('/getAllServises', partnerController.getAllServices);
 router.patch('/updatePartnerServices', protect, partnerController.updatePartnerServices);
-router.get("/services/selected", protect, partnerController.getSelectedServices);
-router.get("/services/unselected", protect, partnerController.getUnselectedServices);
-router.get("/services/getAllPartnerServices", protect, partnerController.getAllPartnerServices);
-
+router.get('/services/selected/:garageId', partnerController.getSelectedServices);
+router.get('/services/unselected/:garageId', partnerController.getUnselectedServices);
+router.get('/services/getAllPartnerServices/:garageId', partnerController.getAllPartnerServices);
 // ===== Must always be LAST =====
 router.get('/:id', partnerController.getPartnerById);
 

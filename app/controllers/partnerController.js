@@ -1070,11 +1070,16 @@ exports.getAllServices = async (req, res) => {
 
 exports.getSelectedServices = async (req, res) => {
   try {
-    const partnerId = req.user.id;
-console.log("Fetching selected services for partner ID:", partnerId);
-    const partner = await Partner.findById(partnerId);
+    const { garageId } = req.params;
+
+    if (!garageId) {
+      return res.status(400).json({ success: false, message: "garageId is required" });
+    }
+
+    const partner = await Partner.findOne({ garageId });
+
     if (!partner) {
-      return res.status(404).json({ message: "Partner not found" });
+      return res.status(404).json({ success: false, message: "Partner not found" });
     }
 
     const selectedServices = partner.services
@@ -1089,23 +1094,27 @@ console.log("Fetching selected services for partner ID:", partnerId);
       message: "Selected services fetched successfully",
       data: selectedServices
     });
+
   } catch (error) {
     console.error("Error fetching selected services:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error"
-    });
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
 
+
 exports.getUnselectedServices = async (req, res) => {
   try {
-    const partnerId = req.user.id;
+    const { garageId } = req.params;
 
-    const partner = await Partner.findById(partnerId);
+    if (!garageId) {
+      return res.status(400).json({ success: false, message: "garageId is required" });
+    }
+
+    const partner = await Partner.findOne({ garageId });
+
     if (!partner) {
-      return res.status(404).json({ message: "Partner not found" });
+      return res.status(404).json({ success: false, message: "Partner not found" });
     }
 
     const unselectedServices = partner.services
@@ -1120,22 +1129,26 @@ exports.getUnselectedServices = async (req, res) => {
       message: "Unselected services fetched successfully",
       data: unselectedServices
     });
+
   } catch (error) {
     console.error("Error fetching unselected services:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error"
-    });
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
+
 exports.getAllPartnerServices = async (req, res) => {
   try {
-    const partnerId = req.user.id;
+    const { garageId } = req.params;
 
-    const partner = await Partner.findById(partnerId);
+    if (!garageId) {
+      return res.status(400).json({ success: false, message: "garageId is required" });
+    }
+
+    const partner = await Partner.findOne({ garageId });
+
     if (!partner) {
-      return res.status(404).json({ message: "Partner not found" });
+      return res.status(404).json({ success: false, message: "Partner not found" });
     }
 
     return res.status(200).json({
@@ -1143,14 +1156,13 @@ exports.getAllPartnerServices = async (req, res) => {
       message: "All partner services fetched successfully",
       data: partner.services
     });
+
   } catch (error) {
-    console.error("Error fetching partner services:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error"
-    });
+    console.error("Error fetching all services:", error);
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
 
 exports.getAllPartnersByVehicleTypes = async (req, res) => {
   try {

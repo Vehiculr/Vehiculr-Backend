@@ -1,8 +1,11 @@
 const Review = require("../models/reviewModel");
+const QuickReview = require("../models/quickReviewModel");
 const Partner = require("../models/partnerModel");
 const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const cloudinary = require("cloudinary").v2;
 const { uploadMultipleToS3, getSignedS3Url } = require('../utils/aws-S3-Config');
+
+const { ObjectId } = require("mongoose").Types;
 
 // Add a Quick Review
 exports.addReview = async (req, res) => {
@@ -123,47 +126,71 @@ exports.getAllReviews = async (req, res) => {
     const { page = 1, limit = 10, sort = "latest" } = req.query;
 
     const skip = (page - 1) * limit;
-
     const sortOrder = sort === "oldest" ? 1 : -1;
 
+    const stringGarageId = String(garageId);
+
     const pipeline = [
-
-      // ====== Normal Reviews ======
+      // ===== NORMAL REVIEWS =====
       {
-        $match: { garageId }
+        $addFields: {
+          garageIdString: { $toString: "$garageId" }
+        }
       },
       {
-        $addFields: { reviewType: "normal" }
+        $match: { garageIdString: stringGarageId }
+      },
+      {
+        $addFields: { reviewSource: "normal" }
       },
 
-      // ====== UNION WITH QUICK REVIEWS ======
+      // ===== UNION WITH QUICK REVIEWS =====
       {
         $unionWith: {
-          coll: "quickreviews",  // collection name
+          coll: "quickreviews",
           pipeline: [
-            { $match: { garageId } },
-            { $addFields: { reviewType: "quick" } }
+            {
+              $addFields: {
+                garageIdString: { $toString: "$garageId" }
+              }
+            },
+            {
+              $match: { garageIdString: stringGarageId }
+            },
+            {
+              $addFields: { reviewSource: "quick" }
+            }
           ]
         }
       },
 
-      // ====== Sort (latest/oldest) ======
+      // ===== SORT + PAGINATION =====
       { $sort: { createdAt: sortOrder } },
-
-      // ====== Pagination ======
       { $skip: skip },
       { $limit: parseInt(limit) }
     ];
 
     const reviews = await Review.aggregate(pipeline);
 
-    // ===== Count total =====
+    // TOTAL COUNT
     const countPipeline = [
-      { $match: { garageId } },
+      {
+        $addFields: {
+          garageIdString: { $toString: "$garageId" }
+        }
+      },
+      { $match: { garageIdString: stringGarageId } },
       {
         $unionWith: {
           coll: "quickreviews",
-          pipeline: [{ $match: { garageId } }]
+          pipeline: [
+            {
+              $addFields: {
+                garageIdString: { $toString: "$garageId" }
+              }
+            },
+            { $match: { garageIdString: stringGarageId } }
+          ]
         }
       },
       { $count: "total" }
@@ -176,8 +203,8 @@ exports.getAllReviews = async (req, res) => {
       success: true,
       message: "All reviews fetched successfully",
       total,
-      page: parseInt(page),
-      limit: parseInt(limit),
+      page: Number(page),
+      limit: Number(limit),
       reviews
     });
 
