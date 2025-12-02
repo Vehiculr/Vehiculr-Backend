@@ -51,9 +51,13 @@ app.use(
 
 //Implement CORS
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://13.27.251.120',   // your production frontend domain
-  'https://vehiculr.com' // add if HTTPS
+ 'http://localhost:3000',
+  'http://3.27.251.120',       // Your Nginx server (frontend) - ADD THIS
+  'http://13.27.251.120',      // This one too
+  'http://54.253.155.193',     // Your backend server (for direct testing)
+  'http://54.253.155.193:9002', // Backend with port
+  'http://172.31.15.208',      // Your EC2 private IP (if accessed internally)
+  'https://vehiculr.com'
 ];
 
 app.use(cors({
