@@ -1140,97 +1140,106 @@ exports.loginWithEmail = catchAsync(async (req, res, next) => {
  * 🔹 2️⃣ Login via Phone (Request OTP)
  ***********************************/
 exports.loginRequestOTP = catchAsync(async (req, res, next) => {
-  const { phone } = req.body;
+  const { phone, accountType } = req.body;
 
-  if (!phone) return next(new AppError("Phone number is required", 400));
+  console.log(`📱 Login OTP requested for: ${phone}, type: ${accountType}`);
 
-  // Find user/partner in parallel
-  const [foundUser, foundPartner] = await Promise.all([
-    User.findOne({ phone }),
-    Partner.findOne({ phone }),
-  ]);
+  if (!phone || !accountType)
+    return next(new AppError("Phone and accountType are required", 400));
 
-  const account = foundUser || foundPartner;
-  if (!account)
-    return next(new AppError("Account not found. Please register first.", 404));
+  if (!["user", "partner"].includes(accountType)) {
+    return next(new AppError("Invalid accountType. Must be 'user' or 'partner'", 400));
+  }
 
-  const accountType = foundUser ? "user" : "partner";
+  // Check phone in User & Partner
+  const user = await User.findOne({ phone });
+  const partner = await Partner.findOne({ phone });
+
+  // ❌ Conflict: Same number exists in BOTH
+  if (user && partner) {
+    return next(
+      new AppError("Phone number already exists for another account type. Contact support.", 400)
+    );
+  }
+
+  // 🔒 Validate login type
+  if (accountType === "user" && !user)
+    return next(new AppError("User not found. Please register first.", 404));
+
+  if (accountType === "partner" && !partner)
+    return next(new AppError("Partner not found. Please register first.", 404));
+
+  const account = accountType === "user" ? user : partner;
 
   // Generate OTP
   const otp = generateOTP();
   const expiryMinutes = Number(process.env.OTP_EXPIRY) || 10;
-  const otpExpires = Date.now() + expiryMinutes * 60 * 1000;
 
   account.otp = otp;
-  account.otpExpires = new Date(otpExpires);
+  account.otpExpires = Date.now() + expiryMinutes * 60 * 1000;
   await account.save();
 
-  // Send OTP
+  // send otp
   const otpResponse = await sendOTP(phone, otp);
   if (!otpResponse.success)
     return next(new AppError("Failed to send OTP", 500));
 
   return res.status(200).json({
     success: true,
-    message: "OTP sent successfully for login",
+    message: "OTP sent successfully",
     accountType,
     mode: isProduction() ? "production" : "development",
-    ...(!isProduction() && {
-      otp,
-      expiresIn: `${expiryMinutes} minutes`,
-    }),
+    ...(!isProduction() && { otp })
   });
 });
+
 
 /***********************************
  * 🔹 3️⃣ Verify OTP (Complete Login)
  ***********************************/
 exports.loginVerifyOTP = catchAsync(async (req, res, next) => {
-  const { phone, otp } = req.body;
+  const { phone, otp, accountType } = req.body;
 
-  if (!phone || !otp)
-    return next(new AppError("Phone and OTP are required", 400));
+  if (!phone || !otp || !accountType)
+    return next(new AppError("Phone, OTP, and accountType are required", 400));
 
-  const [foundUser, foundPartner] = await Promise.all([
-    User.findOne({ phone }),
-    Partner.findOne({ phone }),
-  ]);
+  const user = await User.findOne({ phone });
+  const partner = await Partner.findOne({ phone });
 
-  const account = foundUser || foundPartner;
-  if (!account) return next(new AppError("Account not found", 404));
-
-  const accountType = foundUser ? "user" : "partner";
-
-  let isValidOTP = false;
-
-  console.log(
-    `🔎 Verifying OTP for ${accountType} -> ${account.phone}`
-  );
-
-  const testOTP = process.env.DEFAULT_OTP || "12345";
-  const now = Date.now();
-
-  if (isProduction()) {
-    isValidOTP = account.otp === otp && account.otpExpires > now;
-  } else {
-    // In development mode allow master test OTP
-    isValidOTP =
-      (account.otp === otp && account.otpExpires > now) ||
-      otp === testOTP;
-
-    if (otp === testOTP) {
-      console.log("⚠️ Dev Mode: Using DEFAULT_OTP (test bypass)");
-    }
+  // ❌ same number exists on both
+  if (user && partner) {
+    return next(
+      new AppError("Phone conflict: number exists for two accounts. Contact support.", 400)
+    );
   }
+
+  // Validate based on login type
+  const account =
+    accountType === "user" ? user :
+    accountType === "partner" ? partner :
+    null;
+
+  if (!account) {
+    return next(new AppError(`${accountType} account not found`, 404));
+  }
+
+  // OTP validation
+  const now = Date.now();
+  const testOTP = process.env.DEFAULT_OTP || "12345";
+
+  const isValidOTP = isProduction()
+    ? account.otp === otp && account.otpExpires > now
+    : (account.otp === otp && account.otpExpires > now) || otp === testOTP;
 
   if (!isValidOTP)
     return next(new AppError("Invalid or expired OTP", 400));
 
-  // Clear OTP after success
+  // Clear OTP
   account.otp = undefined;
   account.otpExpires = undefined;
   await account.save();
 
-  // Send JWT + cookie
+  // Generate token
   return createSendToken(account, 200, res);
 });
+
