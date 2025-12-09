@@ -1,3 +1,25 @@
+/**
+ * @swagger
+ * /partners/nearby:
+ *   get:
+ *     summary: Get partners nearby
+ *     parameters:
+ *       - in: query
+ *         name: latitude
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: longitude
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: maxDistance
+ *         schema:
+ *           type: number
+ *     responses:
+ *       200:
+ *         description: A list of partners
+ */
 const express = require('express');
 const router = express.Router();
 const partnerController = require('../controllers/partnerController');
@@ -9,7 +31,15 @@ const publicQrController = require('../controllers/publicQrController');
 const { validateBrandSelection } = require('../valiations/brandValidation');
 const { validateOTPRequest, validateOTPVerification } = require('../valiations/partnerValidation');
 const { googleLogin } = require("../controllers/authController");
+const { query } = require('joi');
+const validate = require('../middleware/validate');
 
+
+const nearbyQuerySchema = require('joi').object({
+  latitude: require('joi').number().min(-90).max(90).optional(),
+  longitude: require('joi').number().min(-180).max(180).optional(),
+  maxDistance: require('joi').number().min(0).optional()
+});
 // Configure multer for file uploads
 // / const storage = multer.diskStorage({
 //   destination: function (req, file, cb) {
@@ -56,7 +86,7 @@ router.post('/', partnerController.createPartner);
 router.get('/', partnerController.getAllPartners);
 
 // ===== Public routes =====
-router.get('/nearby', partnerController.findNearbyPartners);
+router.get('/nearby', validate.query(nearbyQuerySchema), partnerController.findNearbyPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
 router.get('/garage/:garageId', publicQrController.getGarageByPublicId);
 router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
@@ -78,6 +108,10 @@ router.patch('/updatePartnerBrands', protect, validateBrandSelection, partnerCon
 router.patch('/uploadShopPhotos', upload.array('photos', 4), protect, partnerController.uploadShopPhotos);
 router.get('/check-limit', protect, restrictTo('partner'), partnerController.checkBrandLimit);
 router.get('/my-brands', protect, restrictTo('partner'), partnerController.getPartnerBrands);
+
+//Search Garages Api 
+//GET /api/garages/search?query=wash&lat=12.97&lng=77.59&page=1&limit=10&vehicleType=Car&expertise=Engine
+router.get('/search', protect, partnerController.searchGarages);
 
 
 

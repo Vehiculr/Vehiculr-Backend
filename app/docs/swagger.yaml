@@ -1,0 +1,188 @@
+openapi: 3.0.0
+info:
+  title: Vehiculr Auth API
+  version: 1.0.0
+  description: Authentication APIs for Vehiculr backend.
+
+servers:
+  - url: http://localhost:9002/api
+
+tags:
+  - name: Auth
+    description: User authentication & authorization APIs
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          example: test@example.com
+        password:
+          type: string
+          example: Pass@12345
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Login successful
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: rf_eyJhbGciOiJIUzUxMiIsInR...
+
+    OTPRequest:
+      type: object
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+          example: "9876543210"
+
+    OTPVerify:
+      type: object
+      required:
+        - phone
+        - otp
+      properties:
+        phone:
+          type: string
+          example: "9876543210"
+        otp:
+          type: string
+          example: "123456"
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          example: rf_ey12345...
+
+    GoogleLoginRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          example: ya29.a0AWY7Ck...
+
+paths:
+  /auth/login/email:
+    post:
+      tags: [Auth]
+      summary: Login using email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        400:
+          description: Invalid credentials
+
+  /auth/login/request-otp:
+    post:
+      tags: [Auth]
+      summary: Request OTP for phone login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPRequest'
+      responses:
+        200:
+          description: OTP sent successfully
+
+  /auth/login/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPVerify'
+      responses:
+        200:
+          description: OTP verified
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Unified login (email or phone + OTP)
+      requestBody:
+        required: false
+      responses:
+        200:
+          description: Login successful
+
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Login using Google OAuth token
+      description: Accepts Google identity token and returns JWT access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginRequest'
+      responses:
+        200:
+          description: Google login successful
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Generate new access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        200:
+          description: New access token generated
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout user and invalidate refresh token
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Logged out successfully
+
+  /auth/verify-quote-login:
+    post:
+      tags: [Auth]
+      summary: Verify quote OTP login (special flow)
+      responses:
+        200:
+          description: Quote login verified

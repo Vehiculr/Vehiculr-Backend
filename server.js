@@ -1,68 +1,89 @@
-require('dotenv').config();
-const mongoose = require('mongoose');
-require('express-async-errors');
-require('dotenv').config({ path: './.env' });
-process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+// server.js
+"use strict";
 
-const app = require('./app');
-const logger = require('./app/utils/logger').getLogger(__filename);
+require("dotenv").config();
+require("express-async-errors");
 
-// const DB = process.env.DATABASE.replace('<PASSWORD>', process.env.DATABASE_PASSWORD);
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => logger.info('✅ MongoDB connected'))
-  .catch(err => logger.error('❌ MongoDB connection error:', err));
+const http = require("http");
+const { connectDB, disconnectDB } = require("./app/config/db");
 
-const disconnectDB = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-    logger.info('MongoDB disconnected');
-  }
-};
+const { getLogger } = require("./app/utils/logger");
 
+const logger = getLogger("SERVER");
+const app = require("./app");
+// const { console } = require("inspector");
 
-// Uncaught Exceptions (sync errors)
-process.on('uncaughtException', (err) => {
-  logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  logger.error(err.name, err.message);
-  process.exit(1); // Optional: exit to avoid unstable state
-});
+// Load all environment variables
+const { loadEnv } = require('./app/config/env');
+const env = loadEnv();
+// --------------------------------------------------------------
+// 🔹 ENV values
+// --------------------------------------------------------------
+const PORT = Number(process.env.PORT || 9003);
+const FORCE_SHUTDOWN_MS = Number(process.env.FORCE_SHUTDOWN_MS || 30000);
 
-// Graceful shutdown
-const cleanup = async () => {
-  await disconnectDB();
-  logger.info('🧹 Cleanup done. Shutting down...');
-  // Example: close DB connection or Redis
-  // mongoose.connection.close()
-  // redisClient.quit()
-};
+let server;
 
-process.once('SIGINT', async () => {
-  logger.warn('SIGINT received (Ctrl+C). Shutting down...');
-  await cleanup();
-  process.exit(0);
-});
+// --------------------------------------------------------------
+// 🔹 Connect to MongoDB (config/db.js)
+// --------------------------------------------------------------
+connectDB(env.MONGO_URI);  // pass the URI here
 
-process.once('SIGTERM', async () => {
-  logger.warn('SIGTERM received. Shutting down...');
-  await cleanup();
-  process.exit(0);
-});
+// --------------------------------------------------------------
+// 🔹 Start Server
+// --------------------------------------------------------------
+function startServer() {
+  server = http.createServer(app);
 
-process.once('exit', async () => {
-  await cleanup();
-});
-
-const port = process.env.PORT || 9003;
-const server = app.listen(port, () => {
-  logger.info(`🚀 App running on port ${port} in ${process.env.NODE_ENV} mode`)
-});
-
-process.on('unhandledRejection', (err) => {
-  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.log(err.name, err.message);
-  server.close(() => {
-    process.exit(1);
+  server.listen(PORT, () => {
+    logger.info(`🚀 Server running on port ${PORT} (${process.env.NODE_ENV})`);
   });
+
+  server.on("error", (err) => logger.error("Server error:", err));
+}
+
+startServer();
+
+// --------------------------------------------------------------
+// 🔹 Graceful Shutdown
+// --------------------------------------------------------------
+async function gracefulShutdown(signal) {
+  logger.warn(`${signal} received. Gracefully shutting down...`);
+
+  try {
+    if (server) {
+      server.close(async () => {
+        await disconnectDB();
+        logger.info("🧹 Cleanup done. Exiting...");
+        process.exit(0);
+      });
+
+      setTimeout(() => {
+        logger.error("⏱ Force shutdown due to timeout");
+        process.exit(1);
+      }, FORCE_SHUTDOWN_MS).unref();
+    }
+  } catch (err) {
+    logger.error("Shutdown error:", err);
+    process.exit(1);
+  }
+}
+
+process.once("SIGINT", () => gracefulShutdown("SIGINT"));
+process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+// --------------------------------------------------------------
+// 🔹 Unhandled Rejections
+// --------------------------------------------------------------
+process.on("unhandledRejection", (err) => {
+  logger.error("UNHANDLED REJECTION:", err);
+  gracefulShutdown("unhandledRejection");
 });
 
-
+// --------------------------------------------------------------
+// 🔹 Uncaught Exceptions
+// --------------------------------------------------------------
+process.on("uncaughtException", (err) => {
+  logger.error("UNCAUGHT EXCEPTION:", err);
+  process.exit(1);
+});

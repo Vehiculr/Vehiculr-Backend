@@ -1,0 +1,90 @@
+--- Folder Layout ---
+.env
+[.git] (...)
+.gitignore
+[.idea] (...)
+README.md
+[app]
+    ├── [controllers]
+        ├── addressController.js
+        ├── authController.js
+        ├── blogController.js
+        ├── bookingController.js
+        ├── brandController.js
+        ├── cityController.js
+        ├── errorController.js
+        ├── feedController.js
+        ├── garageController.js
+        ├── handlerFactory.js
+        ├── houseController.js
+        ├── kycController.js
+        ├── leadController.js
+        ├── partnerController.js
+        ├── postReviewController.js
+        ├── publicQrController.js
+        ├── quickReviewController.js
+        ├── reviewController.js
+        ├── uploadController.js
+        └── userController.js
+    ├── [middleware]
+        ├── errorHandler.js
+        ├── multer.js
+        ├── rateLimiter.js
+        ├── security.js
+        └── uploadMiddleware.js
+    ├── [models]
+        ├── addressModel.js
+        ├── bikeModel.js
+        ├── blogModel.js
+        ├── bookingModel.js
+        ├── brandModel.js
+        ├── carModel.js
+        ├── enquiryModel.js
+        ├── feedModel.js
+        ├── garageModel.js
+        ├── garageReview.js
+        ├── houseModel.js
+        ├── leadModel.js
+        ├── locationModel.js
+        ├── partnerModel.js
+        ├── postReview.js
+        ├── quickReviewModel.js
+        ├── reviewModel.js
+        ├── topicsModel.js
+        └── userModel.js
+    ├── [routes] (...)
+    ├── [services]
+        ├── msg91Service.js
+        ├── partnerMasterServices.js
+        ├── smsService.js
+        └── twilioClient.js
+    ├── [utils]
+        ├── apiFeatures.js
+        ├── appError.js
+        ├── aws-S3-Config.js
+        ├── cashfreeClient.js
+        ├── catchAsync.js
+        ├── cloudinaryConfig.js
+        ├── email.js
+        ├── filterObject.js
+        ├── generateOTP.js
+        ├── logger.js
+        ├── ocrUtils.js
+        ├── qrGenerator.js
+        └── tokenUtils.js
+    └── [valiations]
+        ├── brandValidation.js
+        ├── kycValidation.js
+        ├── partnerValidation.js
+        ├── qrValidation.js
+        └── vehicleValidation.js
+app.js
+[logs] (...)
+[node_modules] (...)
+package-lock.json
+package.json
+project-hierarchy.txt
+project_layout.txt
+readme.md
+server.js
+[uploads]

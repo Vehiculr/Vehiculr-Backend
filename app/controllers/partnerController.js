@@ -1199,3 +1199,134 @@ exports.getAllPartnersByVehicleTypes = async (req, res) => {
     });
   }
 };
+
+exports.searchGarages = async (req, res) => {
+  try {
+    let {
+      query = "",
+      lat = "12.9716",
+      lng = "77.5946",
+      page = 1,
+      limit = 10,
+      vehicleType,   // Car / Bike
+      expertise      // "Engine", "Washing", etc.
+    } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid latitude or longitude",
+      });
+    }
+
+    // 🔥 Base match conditions
+    const matchConditions = {};
+
+    // Search by name (case insensitive)
+    if (query) {
+      matchConditions.$or = [
+        { businessName: { $regex: query, $options: "i" } },
+        { fullName: { $regex: query, $options: "i" } }
+      ];
+    }
+
+    // Vehicle filter
+    if (vehicleType) {
+      matchConditions.vehicleTypes = vehicleType; // Car / Bike
+    }
+
+    // Expertise filter
+    if (expertise) {
+      matchConditions.expertise = expertise; // must match inside expertise array
+    }
+
+    // 🔥 GeoJSON location
+    const userLocation = {
+      type: "Point",
+      coordinates: [longitude, latitude]
+    };
+
+    // 🔥 Final Aggregation Pipeline
+    const pipeline = [
+      {
+        $geoNear: {
+          near: userLocation,
+          distanceField: "distance",
+          spherical: true
+        }
+      },
+      { $match: matchConditions },
+
+      // Add km distance
+      {
+        $addFields: {
+          distanceInKm: { $round: [{ $divide: ["$distance", 1000] }, 2] }
+        }
+      },
+
+      // Sorting: nearest first
+      { $sort: { distance: 1 } },
+
+      // Pagination
+      { $skip: skip },
+      { $limit: limit },
+
+      // Project only required fields
+      {
+        $project: {
+          fullName: 1,
+          businessName: 1,
+          expertise: 1,
+          vehicleTypes: 1,
+          phone: 1,
+          shopLocation: 1,
+          distanceInKm: 1,
+          shopPhotos: 1
+        }
+      }
+    ];
+
+    const data = await Partner.aggregate(pipeline);
+
+    // Count total (without pagination)
+    const countPipeline = [
+      {
+        $geoNear: {
+          near: userLocation,
+          distanceField: "distance",
+          spherical: true
+        }
+      },
+      { $match: matchConditions },
+      { $count: "total" }
+    ];
+
+    const totalResult = await Partner.aggregate(countPipeline);
+    const total = totalResult?.[0]?.total || 0;
+
+    res.status(200).json({
+      success: true,
+      total,
+      page,
+      limit,
+      results: data.length,
+      garages: data
+    });
+
+  } catch (error) {
+    console.error("Search Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+

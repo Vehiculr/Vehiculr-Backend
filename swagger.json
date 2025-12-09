@@ -1,0 +1,628 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Vehiculr API",
+    "version": "1.0.0",
+    "description": "Full API specification for the Vehiculr backend (Express + Mongoose)."
+  },
+  "servers": [
+    { "url": "http://localhost:9002/api", "description": "Local" },
+    { "url": "https://api.yourdomain.com/api", "description": "Production" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Error message" },
+          "error": { "type": "string", "example": "Validation failed" }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "example": 1 },
+          "limit": { "type": "integer", "example": 10 },
+          "total": { "type": "integer", "example": 123 }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string", "example": "user" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AuthRequestOtp": {
+        "type": "object",
+        "properties": {
+          "phone": { "type": "string", "example": "9876543210" }
+        },
+        "required": ["phone"]
+      },
+      "AuthVerifyOtp": {
+        "type": "object",
+        "properties": {
+          "phone": { "type": "string" },
+          "otp": { "type": "string" }
+        },
+        "required": ["phone","otp"]
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "token": { "type": "string", "example": "JWT_TOKEN_HERE" },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "Partner": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "fullName": { "type": "string" },
+          "businessName": { "type": "string" },
+          "phone": { "type": "string" },
+          "expertise": { "type": "array", "items": { "type": "string" } },
+          "shopLocation": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "example": "Point" },
+              "coordinates": { "type": "array", "items": { "type": "number" }, "example": [77.5946,12.9716] }
+            }
+          },
+          "distanceInKm": { "type": "number", "example": 1.23 }
+        }
+      },
+      "Garage": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "phone": { "type": "string" },
+          "photos": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/User" },
+          "garageId": { "type": "string" },
+          "rating": { "type": "number", "example": 4.5 },
+          "comment": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "userId": { "type": "string" },
+          "garageId": { "type": "string" },
+          "vehicleType": { "type": "string" },
+          "slotTime": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "example": "booked" }
+        }
+      },
+      "Blog": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "author": { "type": "string" }
+        }
+      },
+      "QuickReview": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "garageId": { "type": "string" },
+          "rating": { "type": "number" }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+   "/auth/login/email": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Login with Email + Password",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "email": { "type": "string", "example": "user@example.com" },
+              "password": { "type": "string", "example": "123456" }
+            },
+            "required": ["email", "password"]
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Login successful",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "token": { "type": "string" },
+                "user": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Invalid email or password",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiError" }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/login/request-otp": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Request OTP for Login (Phone)",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "phone": { "type": "string", "example": "9876543210" }
+            },
+            "required": ["phone"]
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "OTP Sent",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "message": { "type": "string", "example": "OTP sent successfully" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/login/verify-otp": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Verify OTP for Login",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "phone": { "type": "string", "example": "9876543210" },
+              "otp": { "type": "string", "example": "1234" }
+            },
+            "required": ["phone", "otp"]
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "OTP Verified & User Logged In",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "token": { "type": "string" },
+                "user": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Invalid OTP",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiError" }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/login": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Unified Login (Email + Password OR Phone + OTP)",
+    "description": "Backend auto-detects whether the user is using OTP or Password.",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "email": { "type": "string" },
+              "password": { "type": "string" },
+              "phone": { "type": "string" },
+              "otp": { "type": "string" }
+            },
+            "example": {
+              "email": "user@example.com",
+              "password": "123456"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Logged In",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "token": { "type": "string" },
+                "user": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/auth/google": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Google Authentication",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "idToken": { "type": "string", "example": "GOOGLE_ID_TOKEN" }
+            },
+            "required": ["idToken"]
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Google login successful",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "token": { "type": "string" },
+                "user": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/refresh": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Refresh JWT Token",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "refreshToken": { "type": "string" }
+            },
+            "required": ["refreshToken"]
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Token refreshed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "token": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/logout": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Logout User",
+    "responses": {
+      "200": {
+        "description": "Logged out successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "message": { "type": "string", "example": "Logged out" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+
+"/auth/verify-quote-login": {
+  "post": {
+    "tags": ["Auth"],
+    "summary": "Verify OTP for Quote Login",
+    "description": "Used only for quote-related login flow.",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "phone": { "type": "string" },
+              "otp": { "type": "string" }
+            },
+            "required": ["phone", "otp"]
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Verified",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "user": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+
+    "/users": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create user",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type":"object","properties":{ "name":{"type":"string"},"phone":{"type":"string"},"email":{"type":"string"} },"required":["phone"] } } }
+        },
+        "responses": {
+          "201": { "description": "User created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref":"#/components/schemas/ApiError" } } } }
+        }
+      },
+      "get": {
+        "tags": ["Users"],
+        "summary": "List users (paginated)",
+        "parameters": [
+          { "name":"page","in":"query","schema":{"type":"integer","default":1} },
+          { "name":"limit","in":"query","schema":{"type":"integer","default":10} }
+        ],
+        "responses": {
+          "200": {
+            "description": "List",
+            "content": { "application/json": { "schema": { "type":"object","properties":{ "success":{"type":"boolean"},"count":{"type":"integer"},"pagination":{"$ref":"#/components/schemas/Pagination"},"data":{"type":"array","items":{"$ref":"#/components/schemas/User"}} } } } }
+          }
+        }
+      }
+    },
+
+    "/partners/nearby": {
+      "get": {
+        "tags": ["Partners"],
+        "summary": "Find nearby partners by lat/lng",
+        "parameters": [
+          { "name":"latitude","in":"query","schema":{"type":"number"} },
+          { "name":"longitude","in":"query","schema":{"type":"number"} },
+          { "name":"maxDistance","in":"query","schema":{"type":"number","description":"in kilometers"} }
+        ],
+        "responses": {
+          "200": { "description": "Nearby partners", "content": { "application/json": { "schema": { "type":"object","properties":{ "success":{"type":"boolean"},"count":{"type":"integer"},"partners":{"type":"array","items":{"$ref":"#/components/schemas/Partner"}} } } } } },
+          "400": { "description": "Invalid coords", "content": { "application/json": { "schema": { "$ref":"#/components/schemas/ApiError" } } } }
+        }
+      }
+    },
+
+    "/garages": {
+      "get": {
+        "tags": ["Garages"],
+        "summary": "List garages",
+        "parameters":[ { "name":"page","in":"query","schema":{"type":"integer","default":1} }, { "name":"limit","in":"query","schema":{"type":"integer","default":10} } ],
+        "responses": { "200": { "description":"List of garages", "content": { "application/json": { "schema": { "type":"object","properties":{ "success":{"type":"boolean"},"count":{"type":"integer"},"data":{"type":"array","items":{"$ref":"#/components/schemas/Garage"}} } } } } } }
+      },
+      "post": {
+        "tags":["Garages"],
+        "summary":"Create garage",
+        "security":[{"bearerAuth":[]}],
+        "requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","properties":{"name":{"type":"string"},"address":{"type":"string"},"phone":{"type":"string"}},"required":["name","address"]}}}},
+        "responses":{"201":{"description":"Garage created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Garage"}}}}}
+      }
+    },
+
+    "/garages/{id}": {
+      "get": {
+        "tags":["Garages"],
+        "summary":"Get garage by ID",
+        "parameters":[ { "name":"id","in":"path","required":true,"schema":{"type":"string"} } ],
+        "responses":{"200":{"description":"Garage detail","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Garage"}}}},"404":{"description":"Not found","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ApiError"}}}}}
+      }
+    },
+
+    "/reviews": {
+      "post": {
+        "tags":["Reviews"],
+        "summary":"Add a review",
+        "security":[{"bearerAuth":[]}],
+        "requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","properties":{"garageId":{"type":"string"},"rating":{"type":"number"},"comment":{"type":"string"}},"required":["garageId","rating"]}}}},
+        "responses":{"201":{"description":"Review added","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Review"}}}}}
+      },
+      "get": {
+        "tags":["Reviews"],
+        "summary":"List reviews for garage",
+        "parameters":[ { "name":"garageId","in":"query","schema":{"type":"string"} }, { "name":"page","in":"query","schema":{"type":"integer","default":1} }, { "name":"limit","in":"query","schema":{"type":"integer","default":10} } ],
+        "responses":{"200":{"description":"List of reviews","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"count":{"type":"integer"},"data":{"type":"array","items":{"$ref":"#/components/schemas/Review"}}}}}}}}
+      }
+    },
+
+    "/booking": {
+      "post": {
+        "tags":["Booking"],
+        "summary":"Create a booking",
+        "security":[{"bearerAuth":[]}],
+        "requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Booking"}}}},
+        "responses":{"201":{"description":"Booking created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Booking"}}}}}
+      },
+      "get": {
+        "tags":["Booking"],
+        "summary":"List bookings (user/admin)",
+        "security":[{"bearerAuth":[]}],
+        "parameters":[ { "name":"page","in":"query","schema":{"type":"integer","default":1} }, { "name":"limit","in":"query","schema":{"type":"integer","default":10} } ],
+        "responses":{"200":{"description":"Bookings list","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"count":{"type":"integer"},"data":{"type":"array","items":{"$ref":"#/components/schemas/Booking"}}}}}}}}
+      }
+    },
+
+    "/blogs": {
+      "get": {
+        "tags":["Blogs"],
+        "summary":"List blogs",
+        "responses":{"200":{"description":"List of blogs","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"data":{"type":"array","items":{"$ref":"#/components/schemas/Blog"}}}}}}}}
+      }
+    },
+
+    "/brands": {
+      "get": {
+        "tags":["Brands"],
+        "summary":"List brands",
+        "responses":{"200":{"description":"Brands list","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"data":{"type":"array","items":{"type":"object"}}}}}}}}
+      }
+    },
+
+    "/city": {
+      "get": {
+        "tags":["City"],
+        "summary":"List cities",
+        "responses":{"200":{"description":"Cities list","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"data":{"type":"array","items":{"type":"object"}}}}}}}}
+      }
+    },
+
+    "/feed": {
+      "get": {
+        "tags":["Feed"],
+        "summary":"Get feed",
+        "responses":{"200":{"description":"Feed","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"data":{"type":"array","items":{"type":"object"}}}}}}}}
+      }
+    },
+
+    "/quickReviews": {
+      "post": {
+        "tags":["QuickReviews"],
+        "summary":"Add quick review",
+        "requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/QuickReview"}}}},
+        "responses":{"201":{"description":"Quick review saved","content":{"application/json":{"schema":{"$ref":"#/components/schemas/QuickReview"}}}}}
+      }
+    },
+
+    "/leads": {
+      "post": {
+        "tags":["Leads"],
+        "summary":"Create a lead",
+        "requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","properties":{"name":{"type":"string"},"phone":{"type":"string"},"message":{"type":"string"}}}}}},
+        "responses":{"201":{"description":"Lead created","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"leadId":{"type":"string"}}}}}}}
+      }
+    },
+
+    "/kyc/upload": {
+      "post": {
+        "tags":["KYC"],
+        "summary":"Upload KYC document",
+        "security":[{"bearerAuth":[]}],
+        "requestBody":{"required":true,"content":{"multipart/form-data":{"schema":{"type":"object","properties":{"file":{"type":"string","format":"binary"},"type":{"type":"string"}}}}}},
+        "responses":{"200":{"description":"File uploaded","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"url":{"type":"string"}}}}}}}
+      }
+    },
+
+    "/uploads": {
+      "post": {
+        "tags":["Uploads"],
+        "summary":"Upload an image (multipart)",
+        "security":[{"bearerAuth":[]}],
+        "requestBody":{"required":true,"content":{"multipart/form-data":{"schema":{"type":"object","properties":{"file":{"type":"string","format":"binary"}}}}}},
+        "responses":{"200":{"description":"Uploaded","content":{"application/json":{"schema":{"type":"object","properties":{"success":{"type":"boolean"},"url":{"type":"string"}}}}}}}
+      }
+    }
+  }
+}

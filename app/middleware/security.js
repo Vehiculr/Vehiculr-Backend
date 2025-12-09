@@ -1,74 +1,127 @@
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-// const cors = require('cors');
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
-const hpp = require('hpp');
+// ./app/middleware/security.js
+"use strict";
 
-// Rate limiting for OTP requests
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const mongoSanitize = require("express-mongo-sanitize");
+const xss = require("xss-clean");
+const hpp = require("hpp");
+const cors = require("cors");
+
+// ===================
+// CORS CONFIG
+// ===================
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  process.env.FRONTEND_URL,
+  "http://localhost:9002",   
+  "https://vehiculr.com",
+  "http://13.27.251.120"
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("❌ CORS Blocked: " + origin));
+    }
+  },
+  credentials: true,
+  methods: "GET,POST,PUT,PATCH,DELETE",
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "x-api-key",
+    "x-client-id"
+  ]
+};
+
+// ===================
+// RATE LIMITERS
+// ===================
+
+// 🔒 OTP brute force protection — HARD LIMIT
 const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000, 
   max: 3,
   message: {
     success: false,
-    error: 'Too many OTP requests, please try again after 15 minutes'
+    error: "Too many OTP attempts. Please wait 15 minutes."
   },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
-// Rate limiting for general API requests
+// 🛡 Generic API protection
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  windowMs: 15 * 60 * 1000,
+  max: 200, 
   message: {
     success: false,
-    error: 'Too many requests, please try again later'
+    error: "Too many requests. Try again later."
   },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
-// Rate limiting for file uploads
+// 📁 Upload protection — avoid storage abuse
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 uploads per hour
+  windowMs: 60 * 60 * 1000,
+  max: 10,
   message: {
     success: false,
-    error: 'Too many uploads, please try again later'
+    error: "Upload limit exceeded. Try later."
   }
 });
 
-// CORS configuration
-// const corsOptions = {
-//   origin: process.env.NODE_ENV === 'production' 
-//     ? process.env.FRONTEND_URL 
-//     : 'http://localhost:3000',
-//   credentials: true,
-//   optionsSuccessStatus: 200
-// };
+// ===================
+// SECURITY MIDDLEWARE
+// ===================
 
-// Security middleware setup
 const securityMiddleware = (app) => {
-  // Set security HTTP headers
-  app.use(helmet());
-  
-  // Enable CORS
-  // app.use(cors(corsOptions));
-  
-  // Data sanitization against NoSQL query injection
+
+  // 🛡 Secure HTTP headers
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // You can enable CSP later if needed
+      crossOriginEmbedderPolicy: false,
+      crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+      crossOriginResourcePolicy: { policy: "cross-origin" }
+    })
+  );
+
+  // 🌍 CORS
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
+
+  // 🧹 Prevent NoSQL injection: { "$gt": "" }
   app.use(mongoSanitize());
-  
-  // Data sanitization against XSS
+
+  // 🧼 Sanitize user input from malicious HTML/script tags
   app.use(xss());
-  
-  // Prevent parameter pollution
-  app.use(hpp());
-  
-  // General rate limiting
-  app.use('/api', apiLimiter);
+
+  // 🚫 Avoid HTTP Param Pollution — whitelist allowed duplicate params
+  app.use(
+    hpp({
+      whitelist: [
+        "brand",
+        "category",
+        "tags",
+        "vehicleTypes"
+      ]
+    })
+  );
+
+  // 🚦 GLOBAL API RATE LIMIT
+  app.use("/api", apiLimiter);
+
+  // Optional: Add per-route limiters in routes:
+  // router.post("/send-otp", otpLimiter, controller.sendOtp);
 };
 
+// Export all
 module.exports = {
   otpLimiter,
   apiLimiter,

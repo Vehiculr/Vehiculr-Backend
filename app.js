@@ -1,128 +1,152 @@
-const express = require('express');
-require('express-async-errors');
-const rateLimit = require('express-rate-limit');
-const errorHandler = require('./app/middleware/errorHandler');
-const morgan = require('morgan');
-const compression = require('compression');
-const cookieParser = require('cookie-parser');
-const helmet = require('helmet');
+// app.js
+"use strict";
 
-const AppError = require('./app/utils/appError');
-const globalErrorHandler = require('./app/controllers/errorController');
-const houseRouter = require('./app/routes/houseRoutes');
-const userRouter = require('./app/routes/userRoutes');
-const reviewRouter = require('./app/routes/reviewRoutes');
-const bookingRouter = require('./app/routes/bookingRoutes');
-const blogRouter = require('./app/routes/blogRoutes');
-const postReviewRouter = require('./app/routes/postReviewRoutes');
-const brandRouter = require('./app/routes/brandRoutes');
-const garageRouter = require('./app/routes/garageRoutes');
-const cityRouter = require('./app/routes/locationRoutes');
-const feedRouter = require('./app/routes/feedRoutes');
-const { securityMiddleware } = require('./app/middleware/security');
-//partner Api
-const partnerRouter = require('./app/routes/partnerRoutes');
-const otpRouter = require('./app/routes/otpRoutes');
-const authRouter = require('./app/routes/authRoutes');
-const quickReviewRouter = require('./app/routes/quickReviewRoutes');
-const leadsRouter = require('./app/routes/leadRoutes');
-const addharKycRouter = require('./app/routes/kycRoutes');
+const express = require("express");
+require("express-async-errors");
+const compression = require("compression");
+const cookieParser = require("cookie-parser");
+const responseTime = require("response-time");
+const helmet = require("helmet");
+const YAML = require("yamljs");
+const swaggerUi = require("swagger-ui-express");
+
+const { getLogger } = require("./app/utils/logger");
+const logger = getLogger("APP");
+
+// Load centralized config
+const { corsOptions, configureCors } = require("./app/config/cors");
+
+const {
+  loadEnv
+} = require("./app/config/env");
+
+const securityMiddleware = require("./app/middleware/security").securityMiddleware;
 
 
+// Routers
+const houseRouter = require("./app/routes/houseRoutes");
+const userRouter = require("./app/routes/userRoutes");
+const reviewRouter = require("./app/routes/reviewRoutes");
+const bookingRouter = require("./app/routes/bookingRoutes");
+const blogRouter = require("./app/routes/blogRoutes");
+const postReviewRouter = require("./app/routes/postReviewRoutes");
+const brandRouter = require("./app/routes/brandRoutes");
+const garageRouter = require("./app/routes/garageRoutes");
+const cityRouter = require("./app/routes/locationRoutes");
+const feedRouter = require("./app/routes/feedRoutes");
+const partnerRouter = require("./app/routes/partnerRoutes");
+const otpRouter = require("./app/routes/otpRoutes");
+const authRouter = require("./app/routes/authRoutes");
+const quickReviewRouter = require("./app/routes/quickReviewRoutes");
+const leadsRouter = require("./app/routes/leadRoutes");
+const addharKycRouter = require("./app/routes/kycRoutes");
+const swaggerRouter = require('./app/swagger/swaggerRoutes');
+const swaggerDocument = require("./swagger.json");
 
+const AppError = require("./app/utils/appError");
+const globalErrorHandler = require("./app/controllers/errorController");
 
-
-const cors = require('cors');
-
+// --------------------------------------------------------------
+// 🔹 Express App
+// --------------------------------------------------------------
 const app = express();
 
-// 1) MIDDLEWARES
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev')); //to log req/res info
-}
+app.set("trust proxy", 1);
 
-//Set security HTTP headers
-app.use(helmet());
+// ---- Swagger Docs ----
+const setupSwagger = require("./app/config/swagger");
+setupSwagger(app);
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+// --------------------------------------------------------------
+// 🔹 Security Headers via Helmet
+// --------------------------------------------------------------
 app.use(
-  helmet.crossOriginResourcePolicy({
-    policy: 'cross-origin'
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 
-//Implement CORS
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://13.27.251.120',   // your production frontend domain
-  'https://vehiculr.com' // add if HTTPS
-];
+// --------------------------------------------------------------
+// 🔹 CORS (from config/cors.js)
+// --------------------------------------------------------------
+app.use(configureCors);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS: ' + origin));
-    }
-  },
-  credentials: true,
-}));
-app.options('*', cors());
+// OPTIONS support
+app.options("*", configureCors);
 
-app.use(express.json());
-//Body parser
-app.use(express.json({ limit: '10kb' }));
+// --------------------------------------------------------------
+// 🔹 Rate limiter (from config/rateLimit.js)
+// --------------------------------------------------------------
+const API_PREFIX = process.env.API_PREFIX || "/api";
+const { apiLimiter } = require("./app/config/rateLimit");
+console.log("apiLimiter:", apiLimiter);
 
+app.use(API_PREFIX, apiLimiter);
+
+// --------------------------------------------------------------
+// 🔹 Additional security middleware (NoSQL injection, HPP, XSS)
+// --------------------------------------------------------------
+securityMiddleware(app);
+
+// --------------------------------------------------------------
+// 🔹 Parsers
+// --------------------------------------------------------------
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 app.use(compression());
-app.set('trust proxy', 1);
+app.use(responseTime());
 
+// --------------------------------------------------------------
+// 🔹 Request Logging
+// --------------------------------------------------------------
 app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();
+  logger.info(`${req.method} ${req.originalUrl} - ${req.ip}`);
   next();
 });
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+// --------------------------------------------------------------
+// 🔹 Routes
+// --------------------------------------------------------------
+app.use(`${API_PREFIX}/users`, userRouter);
+app.use(`${API_PREFIX}/houses`, houseRouter);
+app.use(`${API_PREFIX}/reviews`, reviewRouter);
+app.use(`${API_PREFIX}/booking`, bookingRouter);
+app.use(`${API_PREFIX}/blogs`, blogRouter);
+app.use(`${API_PREFIX}/brands`, brandRouter);
+app.use(`${API_PREFIX}/postReview`, postReviewRouter);
+app.use(`${API_PREFIX}/garages`, garageRouter);
+app.use(`${API_PREFIX}/city`, cityRouter);
+app.use(`${API_PREFIX}/feed`, feedRouter);
+app.use(`${API_PREFIX}/partners`, partnerRouter);
+app.use(`${API_PREFIX}/otps`, otpRouter);
+app.use(`${API_PREFIX}/auth`, authRouter);
+app.use(`${API_PREFIX}/quickReviews`, quickReviewRouter);
+app.use(`${API_PREFIX}/leads`, leadsRouter);
+app.use(`${API_PREFIX}/kyc`, addharKycRouter);
+app.use(`${API_PREFIX}/docs`, swaggerRouter);
+
+// Health Check
+app.get(`${API_PREFIX}/health`, (req, res) =>
+  res.status(200).json({
+    status: "success",
+    message: "Server is healthy 🚀",
+    time: new Date().toISOString(),
+  })
+);
+
+// --------------------------------------------------------------
+// 🔹 404 Handler
+// --------------------------------------------------------------
+app.all("*", (req, res, next) => {
+  next(new AppError(`Cannot find ${req.originalUrl}`, 404));
 });
 
-securityMiddleware(app); // Add security middleware
-
-app.use('/api', limiter);
-
-// ===== Global Route Debug Log =====
-app.use((req, res, next) => {
-  console.log(`🧭 Route Hit: ${req.method} ${req.originalUrl}`);
-  next();
-});
-
-// 2) ROUTES
-app.use('/api/users', userRouter);
-app.use('/api/houses', houseRouter);
-app.use('/api/reviews', reviewRouter);
-app.use('/api/booking', bookingRouter);
-app.use('/api/blogs', blogRouter);
-app.use('/api/brands', brandRouter);
-app.use('/api/postReview', postReviewRouter);
-app.use('/api/garages', garageRouter);
-app.use('/api/city', cityRouter);
-app.use('/api/feed', feedRouter);
-app.use('/api/partners', partnerRouter);
-app.use('/api/otps', otpRouter);
-app.use('/api/auth', authRouter);
-app.use('/api/quickReviews', quickReviewRouter);
-app.use('/api/leads', leadsRouter);
-app.use('/api/kyc', addharKycRouter);
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'success', message: 'Server is healthy 🚀' });
-});
-
-app.all('*', (req, res, next) => {
-  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
-});
-
+// --------------------------------------------------------------
+// 🔹 Global Error Handler
+// --------------------------------------------------------------
 app.use(globalErrorHandler);
 
 module.exports = app;
