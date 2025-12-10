@@ -1211,7 +1211,8 @@ exports.searchGarages = async (req, res) => {
       page = 1,
       limit = 10,
       vehicleType,   // Car / Bike
-      expertise      // "Engine", "Washing", etc.
+      expertise,      // "Engine", "Washing", etc.
+      garageId
     } = req.query;
 
     page = parseInt(page);
@@ -1247,6 +1248,10 @@ exports.searchGarages = async (req, res) => {
     // Expertise filter
     if (expertise) {
       matchConditions.expertise = expertise; // must match inside expertise array
+    }
+
+    if (garageId) {
+      matchConditions.garageId = Number(garageId); // must match with garageId 
     }
 
     // 🔥 GeoJSON location
@@ -1288,6 +1293,7 @@ exports.searchGarages = async (req, res) => {
           expertise: 1,
           vehicleTypes: 1,
           phone: 1,
+          garageId:1,
           shopLocation: 1,
           distanceInKm: 1,
           shopPhotos: 1
