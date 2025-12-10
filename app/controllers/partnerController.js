@@ -970,7 +970,9 @@ exports.findNearbyPartners = async (req, res, next) => {
         $project: {
           fullName: 1,
           businessName: 1,
+          vehicleTypes: 1,  
           phone: 1,
+          garageId:1,
           expertise: 1,
           shopLocation: 1,
           distanceInKm: 1,
