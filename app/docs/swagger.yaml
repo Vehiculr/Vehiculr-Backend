@@ -49,10 +49,14 @@ components:
       type: object
       required:
         - phone
+        - accountType
       properties:
         phone:
           type: string
-          example: "9876543210"
+          example: "+919876543210"
+        accountType:
+          type: string
+          example: "user"
 
     OTPVerify:
       type: object
@@ -62,10 +66,10 @@ components:
       properties:
         phone:
           type: string
-          example: "9876543210"
+          example: "+919876543210"
         otp:
           type: string
-          example: "123456"
+          example: "12345"
 
     RefreshTokenRequest:
       type: object

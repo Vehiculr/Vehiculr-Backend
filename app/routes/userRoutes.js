@@ -10,18 +10,6 @@ const { checkUsernameExists, updateUsername } = require('../controllers/userCont
 const { protect, restrictTo } = require('../controllers/authController');
 const multer = require('multer');
 
-
-// Configure multer for file uploads
-// const storage = multer.diskStorage({
-//   destination: function (req, file, cb) {
-//     cb(null, 'uploads/')
-//   },
-//   filename: function (req, file, cb) {
-//     // Create a unique filename with timestamp
-//     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-//     cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
-//   }
-// });
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
@@ -62,7 +50,7 @@ router
   .route('/')
   .get(userController.getAllUsers)
   .post(userController.createUser);
-  router.get('/count', userController.getUserCount);//to get all user route
+router.get('/count', userController.getUserCount); //to get all user route
 
 // ✅ Profile routes
 router.get('/getMe', authController.protect, userController.setUserId, userController.getMe());
@@ -77,22 +65,9 @@ router.patch('/updateVehicles', authController.protect, userController.updateVeh
 router.patch('/updateRideAndDrives', authController.protect, userController.updateRideAndDrives);
 router.delete('/clearVehicles', authController.protect, userController.clearVehicles);
 
-
-
-
 router
   .route('/userTopics')
   .get(userController.getAllTopics)
   .post(userController.createTopic)
-
-// ✅ Address routes
-router
-  .route('/:houseId/address')
-  .get(userController.getUserAddress, addressController.getAddress)
-  .post(addressController.createAddress, userController.saveUserAddress)
-  .patch(userController.getUserAddress, addressController.updateAddress)
-  .delete(userController.getUserAddress, addressController.deleteAddress);
-// ✅ Houses for owner
-router.route('/me/houses').get(authController.restrictTo('owner'), houseRouter);
 
 module.exports = router;

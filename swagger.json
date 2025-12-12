@@ -48,7 +48,7 @@
       "AuthRequestOtp": {
         "type": "object",
         "properties": {
-          "phone": { "type": "string", "example": "9876543210" }
+          "phone": { "type": "string", "example": "+919012005677" }
         },
         "required": ["phone"]
       },
@@ -151,7 +151,7 @@
             "type": "object",
             "properties": {
               "email": { "type": "string", "example": "user@example.com" },
-              "password": { "type": "string", "example": "123456" }
+              "password": { "type": "string", "example": "12345" }
             },
             "required": ["email", "password"]
           }
@@ -197,7 +197,8 @@
           "schema": {
             "type": "object",
             "properties": {
-              "phone": { "type": "string", "example": "9876543210" }
+              "phone": { "type": "string", "example": "+919012005677" },
+              "accountType": { "type": "string", "example": "user" }
             },
             "required": ["phone"]
           }
@@ -234,8 +235,9 @@
           "schema": {
             "type": "object",
             "properties": {
-              "phone": { "type": "string", "example": "9876543210" },
-              "otp": { "type": "string", "example": "1234" }
+              "phone": { "type": "string", "example": "+919012005677" },
+              "otp": { "type": "string", "example": "12345" },
+              "accountType": { "type": "string", "example": "partner" }
             },
             "required": ["phone", "otp"]
           }
@@ -282,14 +284,12 @@
           "schema": {
             "type": "object",
             "properties": {
-              "email": { "type": "string" },
-              "password": { "type": "string" },
               "phone": { "type": "string" },
               "otp": { "type": "string" }
             },
             "example": {
               "email": "user@example.com",
-              "password": "123456"
+              "password": "12345"
             }
           }
         }
@@ -494,31 +494,6 @@
           "200": { "description": "Nearby partners", "content": { "application/json": { "schema": { "type":"object","properties":{ "success":{"type":"boolean"},"count":{"type":"integer"},"partners":{"type":"array","items":{"$ref":"#/components/schemas/Partner"}} } } } } },
           "400": { "description": "Invalid coords", "content": { "application/json": { "schema": { "$ref":"#/components/schemas/ApiError" } } } }
         }
-      }
-    },
-
-    "/garages": {
-      "get": {
-        "tags": ["Garages"],
-        "summary": "List garages",
-        "parameters":[ { "name":"page","in":"query","schema":{"type":"integer","default":1} }, { "name":"limit","in":"query","schema":{"type":"integer","default":10} } ],
-        "responses": { "200": { "description":"List of garages", "content": { "application/json": { "schema": { "type":"object","properties":{ "success":{"type":"boolean"},"count":{"type":"integer"},"data":{"type":"array","items":{"$ref":"#/components/schemas/Garage"}} } } } } } }
-      },
-      "post": {
-        "tags":["Garages"],
-        "summary":"Create garage",
-        "security":[{"bearerAuth":[]}],
-        "requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","properties":{"name":{"type":"string"},"address":{"type":"string"},"phone":{"type":"string"}},"required":["name","address"]}}}},
-        "responses":{"201":{"description":"Garage created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Garage"}}}}}
-      }
-    },
-
-    "/garages/{id}": {
-      "get": {
-        "tags":["Garages"],
-        "summary":"Get garage by ID",
-        "parameters":[ { "name":"id","in":"path","required":true,"schema":{"type":"string"} } ],
-        "responses":{"200":{"description":"Garage detail","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Garage"}}}},"404":{"description":"Not found","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ApiError"}}}}}
       }
     },
 

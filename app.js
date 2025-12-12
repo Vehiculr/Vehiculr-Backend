@@ -31,7 +31,6 @@ const bookingRouter = require("./app/routes/bookingRoutes");
 const blogRouter = require("./app/routes/blogRoutes");
 const postReviewRouter = require("./app/routes/postReviewRoutes");
 const brandRouter = require("./app/routes/brandRoutes");
-const garageRouter = require("./app/routes/garageRoutes");
 const cityRouter = require("./app/routes/locationRoutes");
 const feedRouter = require("./app/routes/feedRoutes");
 const partnerRouter = require("./app/routes/partnerRoutes");
@@ -78,10 +77,8 @@ app.options("*", configureCors);
 // --------------------------------------------------------------
 // 🔹 Rate limiter (from config/rateLimit.js)
 // --------------------------------------------------------------
+const apiLimiter = require("./app/config/rateLimit");
 const API_PREFIX = process.env.API_PREFIX || "/api";
-const { apiLimiter } = require("./app/config/rateLimit");
-console.log("apiLimiter:", apiLimiter);
-
 app.use(API_PREFIX, apiLimiter);
 
 // --------------------------------------------------------------
@@ -117,7 +114,6 @@ app.use(`${API_PREFIX}/booking`, bookingRouter);
 app.use(`${API_PREFIX}/blogs`, blogRouter);
 app.use(`${API_PREFIX}/brands`, brandRouter);
 app.use(`${API_PREFIX}/postReview`, postReviewRouter);
-app.use(`${API_PREFIX}/garages`, garageRouter);
 app.use(`${API_PREFIX}/city`, cityRouter);
 app.use(`${API_PREFIX}/feed`, feedRouter);
 app.use(`${API_PREFIX}/partners`, partnerRouter);

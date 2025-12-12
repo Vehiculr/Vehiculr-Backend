@@ -25,7 +25,7 @@ const router = express.Router();
 const partnerController = require('../controllers/partnerController');
 const authController = require('../controllers/authController');
 const { protect, restrictTo } = authController;
-const { otpLimiter, apiLimiter } = require('../middleware/security');
+const { otpLimiter } = require('../middleware/security');
 const multer = require('multer');
 const publicQrController = require('../controllers/publicQrController');
 const { validateBrandSelection } = require('../valiations/brandValidation');
@@ -75,8 +75,6 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-
-router.use(apiLimiter);
 
 router.get('/count', partnerController.getPartnerCount);
 

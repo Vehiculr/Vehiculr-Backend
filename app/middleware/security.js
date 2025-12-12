@@ -54,18 +54,6 @@ const otpLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// 🛡 Generic API protection
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200, 
-  message: {
-    success: false,
-    error: "Too many requests. Try again later."
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
 // 📁 Upload protection — avoid storage abuse
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -114,9 +102,6 @@ const securityMiddleware = (app) => {
     })
   );
 
-  // 🚦 GLOBAL API RATE LIMIT
-  app.use("/api", apiLimiter);
-
   // Optional: Add per-route limiters in routes:
   // router.post("/send-otp", otpLimiter, controller.sendOtp);
 };
@@ -124,7 +109,6 @@ const securityMiddleware = (app) => {
 // Export all
 module.exports = {
   otpLimiter,
-  apiLimiter,
   uploadLimiter,
   securityMiddleware
 };
