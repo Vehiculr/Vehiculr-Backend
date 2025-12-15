@@ -35,7 +35,7 @@ const quickReviewSchema = new mongoose.Schema(
     },
     reviewType: {
       type: String,
-      enum: ["quickReview ", "normalReview"],
+      enum: ["quickReview", "normalReview"],
       default: "quickReview",
       required: true
     },
