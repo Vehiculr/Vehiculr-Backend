@@ -86,7 +86,7 @@ router.get('/', partnerController.getAllPartners);
 // ===== Public routes =====
 router.get('/nearby', validate.query(nearbyQuerySchema), partnerController.findNearbyPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
-router.get('/garage/:garageId', partnerController.getPartnerById);
+router.get('/:garageId', partnerController.getPartnerById);
 router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 router.get('/getAllPartners', partnerController.getAllPartnersByVehicleTypes);
 
