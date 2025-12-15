@@ -51,7 +51,7 @@ const upload = multer({
 
 router.post("/addReview", upload.array('photos', 4), authController.protect, reviewController.addReview);
 
-router.get("/getAllReview", reviewController.getAllReviews);
+router.get("/getAllReviews", reviewController.getAllReviews);
 
 router.get("/:garageId", reviewController.getReviewsByGarage);
 

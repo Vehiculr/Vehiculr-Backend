@@ -122,86 +122,67 @@ exports.getReviewsByGarage = async (req, res) => {
 
 exports.getAllReviews = async (req, res) => {
   try {
-    const { garageId } = req.params;
+    const { garageId } = req.query; // OPTIONAL
     const { page = 1, limit = 10, sort = "latest" } = req.query;
 
     const skip = (page - 1) * limit;
     const sortOrder = sort === "oldest" ? 1 : -1;
 
-    const stringGarageId = String(garageId);
-
-    const pipeline = [
-      // ===== NORMAL REVIEWS =====
-      {
-        $addFields: {
-          garageIdString: { $toString: "$garageId" }
+    const matchStage = garageId
+      ? {
+          $addFields: { garageIdString: { $toString: "$garageId" } }
         }
-      },
-      {
-        $match: { garageIdString: stringGarageId }
-      },
-      {
-        $addFields: { reviewSource: "normal" }
-      },
+      : null;
 
-      // ===== UNION WITH QUICK REVIEWS =====
+    const matchCondition = garageId
+      ? { $match: { garageIdString: String(garageId) } }
+      : null;
+
+    /* ================= MAIN PIPELINE ================= */
+    const pipeline = [
+      ...(matchStage ? [matchStage, matchCondition] : []),
+      { $addFields: { reviewSource: "normal" } },
+
       {
         $unionWith: {
           coll: "quickreviews",
           pipeline: [
-            {
-              $addFields: {
-                garageIdString: { $toString: "$garageId" }
-              }
-            },
-            {
-              $match: { garageIdString: stringGarageId }
-            },
-            {
-              $addFields: { reviewSource: "quick" }
-            }
+            ...(matchStage ? [matchStage, matchCondition] : []),
+            { $addFields: { reviewSource: "quick" } }
           ]
         }
       },
 
-      // ===== SORT + PAGINATION =====
       { $sort: { createdAt: sortOrder } },
       { $skip: skip },
-      { $limit: parseInt(limit) }
+      { $limit: Number(limit) }
     ];
 
     const reviews = await Review.aggregate(pipeline);
 
-    // TOTAL COUNT
+    /* ================= COUNT PIPELINE ================= */
     const countPipeline = [
-      {
-        $addFields: {
-          garageIdString: { $toString: "$garageId" }
-        }
-      },
-      { $match: { garageIdString: stringGarageId } },
-      {
-        $unionWith: {
-          coll: "quickreviews",
-          pipeline: [
-            {
-              $addFields: {
-                garageIdString: { $toString: "$garageId" }
-              }
-            },
-            { $match: { garageIdString: stringGarageId } }
-          ]
-        }
-      },
+      ...(matchStage ? [matchStage, matchCondition] : []),
+
+       /* ================= all Review ( quick + normal ) ================= */ 
+      // {
+      //   $unionWith: {
+      //     coll: "quickreviews",
+      //     pipeline: [
+      //       ...(matchStage ? [matchStage, matchCondition] : [])
+      //     ]
+      //   }
+      // },
+
       { $count: "total" }
     ];
 
     const totalResult = await Review.aggregate(countPipeline);
-    const total = totalResult?.[0]?.total || 0;
+    const total = totalResult[0]?.total || 0;
 
     res.status(200).json({
       success: true,
-      message: "All reviews fetched successfully",
+      message: "Reviews fetched successfully",
       total,
       page: Number(page),
       limit: Number(limit),
@@ -217,3 +198,4 @@ exports.getAllReviews = async (req, res) => {
     });
   }
 };
+
