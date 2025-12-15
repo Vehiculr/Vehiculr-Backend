@@ -41,6 +41,7 @@ const leadsRouter = require("./app/routes/leadRoutes");
 const addharKycRouter = require("./app/routes/kycRoutes");
 const swaggerRouter = require('./app/swagger/swaggerRoutes');
 const swaggerDocument = require("./swagger.json");
+const digioAadharKYC = require("./app/routes/aadhaarRoutes");
 
 const AppError = require("./app/utils/appError");
 const globalErrorHandler = require("./app/controllers/errorController");
@@ -123,6 +124,7 @@ app.use(`${API_PREFIX}/quickReviews`, quickReviewRouter);
 app.use(`${API_PREFIX}/leads`, leadsRouter);
 app.use(`${API_PREFIX}/kyc`, addharKycRouter);
 app.use(`${API_PREFIX}/docs`, swaggerRouter);
+app.use(`${API_PREFIX}/digioKYC`, digioAadharKYC);
 
 // Health Check
 app.get(`${API_PREFIX}/health`, (req, res) =>

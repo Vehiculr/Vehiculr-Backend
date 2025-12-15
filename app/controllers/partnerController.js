@@ -100,7 +100,8 @@ exports.getAllPartners = async (req, res) => {
 // GET single partner by ID
 exports.getPartnerById = async (req, res) => {
   try {
-    const partner = await Partner.findById(req.params.id);
+    const partnerId = req.params.garageId;  
+    const partner = await Partner.findOne(req.params);
     if (!partner) {
       return res.status(404).json({ status: 'fail', message: 'Partner not found' });
     }
