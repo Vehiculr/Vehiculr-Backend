@@ -80,15 +80,12 @@ router.get('/count', partnerController.getPartnerCount);
 
 // Routes
 
-router.post('/', partnerController.createPartner);
-router.get('/', partnerController.getAllPartners);
-
 // ===== Public routes =====
 router.get('/nearby', validate.query(nearbyQuerySchema), partnerController.findNearbyPartners);
+router.get('/getAllPartners', partnerController.getAllPartnersByVehicleTypes);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
 router.get('/:garageId', partnerController.getPartnerById);
 router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
-router.get('/getAllPartners', partnerController.getAllPartnersByVehicleTypes);
 
 // ===== Auth routes =====
 router.post('/request-otp', otpLimiter, validateOTPRequest, authController.requestOTP);
