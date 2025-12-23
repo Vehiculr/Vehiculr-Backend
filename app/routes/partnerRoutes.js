@@ -87,6 +87,7 @@ router.get('/', partnerController.getAllPartners);
 router.get('/nearby', validate.query(nearbyQuerySchema), partnerController.findNearbyPartners);
 router.get('/brandsAvailable', partnerController.getAvailableBrands);
 router.get('/garage/:garageId', publicQrController.getGarageByPublicId);
+
 router.get('/profile/:garageId', publicQrController.getGaragePublicProfile);
 router.get('/getAllPartners', partnerController.getAllPartnersByVehicleTypes);
 
@@ -126,7 +127,13 @@ router.get('/services/getAllPartnerServices/:garageId', partnerController.getAll
 // ===== Must always be LAST =====
 router.get('/:id', partnerController.getPartnerById);
 
-
+//follow unfollow routes
+router.post('/:userId/follow', protect, partnerController.followPartner);
+router.delete('/:userId/unfollow', protect, partnerController.unfollowPartner);
+router.get('/:userId/followers', protect, partnerController.getFollowers);
+router.get('/:userId/following', protect, partnerController.getFollowing);
+router.get('/:userId/follow-status', protect, partnerController.getFollowStatus);
+router.get('/:userId/follow-count', protect, partnerController.getFollowCount);
 // QR Code generation route
 // router.get('/qr-code',
 //     authController.protect,

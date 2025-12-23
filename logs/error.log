@@ -1,0 +1,21 @@
+2025-12-12 21:26:06 [SERVER] ERROR: TypeError: disconnectDB is not a function
+    at Server.<anonymous> (D:\vehiculrProject\Vehiculr-Backend\server.js:56:15)
+    at Object.onceWrapper (node:events:632:28)
+    at Server.emit (node:events:518:28)
+    at Server.emit (node:domain:489:12)
+    at emitCloseNT (node:net:2418:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+2025-12-16 22:36:58 [SERVER] ERROR: TypeError: disconnectDB is not a function
+    at Server.<anonymous> (D:\vehiculrProject\Vehiculr-Backend\server.js:56:15)
+    at Object.onceWrapper (node:events:632:28)
+    at Server.emit (node:events:518:28)
+    at Server.emit (node:domain:489:12)
+    at emitCloseNT (node:net:2418:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+2025-12-20 23:00:21 [SERVER] ERROR: TypeError: disconnectDB is not a function
+    at Server.<anonymous> (D:\vehiculrProject\Vehiculr-Backend\server.js:56:15)
+    at Object.onceWrapper (node:events:632:28)
+    at Server.emit (node:events:518:28)
+    at Server.emit (node:domain:489:12)
+    at emitCloseNT (node:net:2418:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
