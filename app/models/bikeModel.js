@@ -39,3 +39,4 @@ bikeSchema.pre(/^find/, function (next) {
 const Bike = mongoose.model('Bike', bikeSchema);
 
 module.exports = Bike;
+

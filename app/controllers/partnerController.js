@@ -4,6 +4,9 @@ const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
+// const { Follow, FollowRequest } = require('..models/followModel');
+const { Follow, FollowRequest } = require('../models/followModel');
+
 // const { deleteFromCloudinary, getOptimizedUrl } = require('../utils/cloudinaryConfig');
 // const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryConfig');
 const { uploadMultipleToS3, getSignedS3Url } = require('../utils/aws-S3-Config');
@@ -98,10 +101,21 @@ exports.getAllPartners = async (req, res) => {
 };
 
 // GET single partner by ID
+// exports.getPartnerById = async (req, res) => {
+//   try {
+//     const partner = await Partner.findById(req.params.id);
+//     if (!partner) {
+//       return res.status(404).json({ status: 'fail', message: 'Partner not found' });
+//     }
+//     res.status(200).json({ status: 'success', data: partner });
+//   } catch (err) {
+//     res.status(500).json({ status: 'error', message: err.message });
+//   }
+// };
 exports.getPartnerById = async (req, res) => {
   try {
-    const partnerId = req.params.garageId;  
-    const partner = await Partner.findOne(req.params);
+    const partner = await Partner.findOne({ garageId: Number(req.params.id) });
+    
     if (!partner) {
       return res.status(404).json({ status: 'fail', message: 'Partner not found' });
     }
@@ -110,6 +124,7 @@ exports.getPartnerById = async (req, res) => {
     res.status(500).json({ status: 'error', message: err.message });
   }
 };
+
 
 // Update KYC (new endpoint)
 exports.updateKYC = async (req, res) => {
@@ -1070,7 +1085,6 @@ exports.getAllServices = async (req, res) => {
     });
   }
 };
-
 exports.getSelectedServices = async (req, res) => {
   try {
     const { garageId } = req.params;
@@ -1103,8 +1117,6 @@ exports.getSelectedServices = async (req, res) => {
     return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
-
-
 
 exports.getUnselectedServices = async (req, res) => {
   try {
@@ -1339,3 +1351,208 @@ exports.searchGarages = async (req, res) => {
   }
 };
 
+
+//follow
+exports.followPartner = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+  const currentPartnerId = req.user.id;
+
+
+  //prevent self follow
+  if (userId.toString() === currentPartnerId.toString()) 
+{
+  return next(new AppError('You cannot follow yourself', 400));
+}
+
+  //check if target partner exists
+  const targetPartner = await Partner.findById(userId);
+  if(!targetPartner)
+   {
+       return next(new AppError('Partner not found', 400));
+   }
+   //check if already following
+   const existingFollow = await Follow.findOne({   // Follow 
+    follower: currentPartnerId,
+    following: userId
+   });
+
+   if(existingFollow)
+   {
+      return next(new AppError('You are already following this partner', 400));
+   }
+
+   // removed duplicate existingFollow check
+
+   if(targetPartner.isPrivate)
+   {
+     //check for existing follow request
+     const existingRequest = await FollowRequest.findOne({
+      requester: currentPartnerId,
+      target: userId,
+      status: 'pending'
+     });
+
+     if(existingRequest)
+     {
+         return next(new AppError('Follow request already send', 400));
+     }
+
+     //create follow request for private account
+     await FollowRequest.create({
+      requester: currentPartnerId,
+      target: userId,
+      status: 'pending'
+     });
+
+     res.status(200).json({
+      success: true,
+      message: 'Follow request send successfully'
+     });
+   }else{
+    //create direct follow for public account
+    await Follow.create({
+      follower: currentPartnerId,
+      following: userId
+    });
+
+    res.status(200).json({
+      success: true, 
+      message: 'Partner followed successfully'
+    });
+   }
+});
+
+//unfollow a partner
+exports.unfollowPartner = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+  const currentPartnerId = req.user.id;
+
+  // delete follow if exists
+  await Follow.findOneAndDelete({
+    follower: currentPartnerId,
+    following: userId
+  });
+
+  // delete pending follow request if exists
+  await FollowRequest.findOneAndDelete({
+    requester: currentPartnerId,
+    target: userId,
+    status: 'pending'
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Partner unfollowed successfully'
+  });
+});
+
+// Get following list
+exports.getFollowing = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const following = await Follow.find({ follower: userId })
+    .populate("following", "fullName businessName")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const followingList = following.map(f => ({
+    id: f.following._id,
+    username: f.following.fullName || f.following.businessName
+  }));
+
+  const totalCount = await Follow.countDocuments({ follower: userId });
+
+  res.status(200).json({
+    page,
+    limit,
+    count: totalCount,
+    following: followingList
+  });
+});
+// Get followers list
+exports.getFollowers = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const followers = await Follow.find({ following: userId })
+    .populate('follower', 'fullName businessName')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const followersList = followers.map(f => ({
+    id: f.follower._id,
+    username: f.follower.fullName || f.follower.businessName
+  }));
+
+  const totalCount = await Follow.countDocuments({ following: userId });
+
+  res.status(200).json({
+    count: totalCount,
+    followers: followersList
+  });
+});
+
+//get follow status
+exports.getFollowStatus = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+  const currentPartnerId = req.user.id;
+
+  //check if follwoign
+  const isFollowing = await Follow.findOne({
+    follower: currentPartnerId,
+    following: userId
+  });
+
+  //checking if request pending
+  const requestPending = await FollowRequest.findOne({
+    requester: currentPartnerId,
+    target: userId,
+    status: 'pending'
+  });
+
+  res.status(200).json({
+    isFollowing: !!isFollowing,
+    requestPending: !!requestPending
+  });
+});
+
+//get follow count
+exports.getFollowCount = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const [followerCount, followingCount] = await Promise.all([
+    Follow.countDocuments({ following: userId }),
+    Follow.countDocuments({ follower: userId})
+  ]);
+
+  res.status(200).json({
+    followers: followerCount,
+    following: followingCount
+  });
+});
+// Get followers list
+// exports.getFollowers = catchAsync(async (req, res, next) => {
+//   const { userId } = req.params;
+
+//   const followers = await Follow.find({ following: userId })
+//     .populate('follower', 'fullName businessName')
+//     .sort({ createdAt: -1 });
+
+//   const followersList = followers.map(f => ({
+//     id: f.follower._id,
+//    username: f.follower.fullName || f.follower.businessName
+//   }));
+
+//   res.status(200).json({
+//     count: followersList.length,
+//     followers: followersList
+//   });
+// });

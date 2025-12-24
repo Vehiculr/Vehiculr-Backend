@@ -58,6 +58,7 @@ const kycSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+
 /* ------------------------- BRANDS SUB-SCHEMA ------------------------- */
 const brandsSchema = new mongoose.Schema({
   carBrands: [{
@@ -121,7 +122,9 @@ const partnerSchema = new mongoose.Schema({
   vehicleTypes: {
     type: [{
       type: String,
-      enum: ["Car", "Bike"]
+      // enum: ["Car", "Bike"]
+      enum: ["Car", "Bike", "CARS", "BIKES"]
+
     }],
     required: true
   },
@@ -191,6 +194,8 @@ const partnerSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'partner', 'admin'], default: 'partner' },
   isVerified: { type: Boolean, default: false },
 
+  //to check private or public
+   isPrivate: { type: Boolean, default: false },
   quoteOtp: String,
   quoteOtpExpires: Date
 
@@ -227,5 +232,6 @@ partnerSchema.pre("save", async function (next) {
 /* ------------------------------ INDEXES ---------------------------------- */
 partnerSchema.index({ shopLocation: "2dsphere" });
 partnerSchema.index({ garageId: 1 }, { unique: true });
+
 
 module.exports = mongoose.model("Partner", partnerSchema);

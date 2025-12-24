@@ -7,3 +7,6 @@ logs/
 # Environment files
 .env
 .env.*
+uploads/
+logs/
+*.log
