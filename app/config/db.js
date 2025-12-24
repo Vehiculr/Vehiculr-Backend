@@ -1,4 +1,3 @@
-// app/config/db.js
 "use strict";
 
 const mongoose = require("mongoose");
@@ -18,6 +17,18 @@ async function connectDB(uri) {
   }
 }
 
+async function disconnectDB() {
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+      console.log("🔌 MongoDB Disconnected");
+    }
+  } catch (err) {
+    console.error("❌ MongoDB Disconnection Error:", err.message);
+  }
+}
+
 module.exports = {
   connectDB,
+  disconnectDB,
 };
