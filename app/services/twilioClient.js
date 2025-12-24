@@ -7,6 +7,22 @@ const isProduction = () => process.env.NODE_ENV === 'production';
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const sendWhatsAppMessage = async (to, message) => {
+  // ================= DEV / LOCAL MODE =================
+  if (!isProduction()) {
+    console.log("🧪 DEV MODE: WhatsApp message skipped");
+    console.log("To:", to);
+    console.log("Message:", message);
+
+    // Dummy success response (Twilio-like)
+    return {
+      sid: "DEV_DUMMY_SID",
+      status: "sent",
+      to,
+      body: message,
+    };
+  }
+
+  // ================= PRODUCTION MODE =================
   try {
     const response = await client.messages.create({
       from: process.env.TWILIO_WHATSAPP_NUMBER,
@@ -16,8 +32,13 @@ const sendWhatsAppMessage = async (to, message) => {
     console.log("✅ WhatsApp sent to:", to, "SID:", response.sid);
     return response;
   } catch (error) {
-    console.error("❌ Twilio Full Error Object:", JSON.stringify(error, null, 2));
+    console.error(
+      "❌ Twilio Error:",
+      error.code,
+      error.message
+    );
 
+    // Daily limit
     if (error.code === 63038) {
       throw new AppError(
         "Daily WhatsApp message limit reached. Please try again tomorrow.",

@@ -22,7 +22,7 @@ const leadSchema = new mongoose.Schema({
             created_at: String
         }
     ],
-    garageId: { type: String, required: true },   // GAROD10D (custom garageId)
+    garageId: { type: String, required: true },   // 123456 (custom garageId)
     partnerId: { type: mongoose.Schema.Types.ObjectId, ref: "Partner" },  // OPTIONAL but useful
     status: {
         type: String,

@@ -20,6 +20,38 @@ const kycSchema = new mongoose.Schema({
   refId: String,
   rawVerifyResponse: Object,
 
+  /* --- NEW FIELDS FOR OTP VERIFICATION PROCESS --- */
+  status: {
+    type: String,
+    enum: ['not_started', 'otp_sent', 'verified', 'failed', 'expired'],
+    default: 'not_started'
+  },
+  transactionId: { // Store Digio's transaction reference
+    type: String,
+    index: true
+  },
+  digioReferenceId: { // Store Digio's final verification ID
+    type: String
+  },
+  // Timestamps for each stage
+  otpSentAt: Date,
+  verifiedAt: Date,
+  failedAt: Date,
+  // Track attempts and errors
+  otpAttempts: {
+    type: Number,
+    default: 0
+  },
+  lastError: {
+    code: String,
+    message: String,
+    occurredAt: Date
+  },
+  // You can keep your existing fields below...
+  aadhaarMasked: String,
+  aadhaarLast4: String,
+  refId: String,
+  rawVerifyResponse: Object,
   verified: {
     type: Boolean,
     default: false
@@ -105,6 +137,20 @@ const partnerSchema = new mongoose.Schema({
 
   kyc: kycSchema,
 
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'in_progress', 'verified', 'rejected', 'expired'],
+    default: 'pending'
+  },
+  kycLastAttempted: Date,
+
+  encryptedKYC: {
+    iv: String,
+    encryptedData: String,
+    authTag: String,
+    algorithm: String,
+    timestamp: Date
+  },
   brands: brandsSchema,
   services: [
     {
